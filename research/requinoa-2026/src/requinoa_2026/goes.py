@@ -90,7 +90,11 @@ def hourly_keys(product: str, start: datetime, end: datetime, fs: s3fs.S3FileSys
     hour = start.replace(minute=0)
     while hour < end:
         prefix = f"{BUCKET}/{product}/{hour:%Y}/{hour.timetuple().tm_yday:03d}/{hour:%H}"
-        keys += [k for k in fs.ls(prefix) if band in k.split("/")[-1]]
+        try:
+            keys += [k for k in fs.ls(prefix) if band in k.split("/")[-1]]
+        except FileNotFoundError:
+            pass  # the folder for a just-started hour appears with its first file
+
         hour += timedelta(hours=1)
     return [k for k in keys if start <= scan_start(k) < end]
 

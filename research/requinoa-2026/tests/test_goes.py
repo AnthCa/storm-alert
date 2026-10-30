@@ -44,3 +44,27 @@ def test_points_off_the_earth_disk_are_nan():
 def test_scan_start_parses_julian_day_and_time():
     key = "noaa-goes19/ABI-L2-CMIPF/2026/299/20/OR_ABI-L2-CMIPF-M6C13_G19_s20262992030202_e2026299_c2026299.nc"
     assert scan_start(key) == datetime(2026, 10, 26, 20, 30, 20, tzinfo=timezone.utc)
+
+
+class FakeS3:
+    """Lists one folder; any other prefix does not exist yet, like a just-started hour."""
+
+    def __init__(self, existing_prefix: str, names: list[str]):
+        self.existing_prefix, self.names = existing_prefix, names
+
+    def ls(self, prefix):
+        if prefix != self.existing_prefix:
+            raise FileNotFoundError(prefix)
+        return [f"{prefix}/{name}" for name in self.names]
+
+
+def test_hourly_keys_tolerates_a_folder_that_does_not_exist_yet():
+    from datetime import datetime, timezone
+
+    from requinoa_2026.goes import hourly_keys
+
+    name = "OR_GLM-L2-LCFA_G19_s20263030159400_e20263030200000_c20263030200020.nc"
+    fs = FakeS3("noaa-goes19/GLM-L2-LCFA/2026/303/01", [name])
+    start = datetime(2026, 10, 30, 1, 30, tzinfo=timezone.utc)
+    end = datetime(2026, 10, 30, 2, 5, tzinfo=timezone.utc)
+    assert hourly_keys("GLM-L2-LCFA", start, end, fs) == [f"noaa-goes19/GLM-L2-LCFA/2026/303/01/{name}"]
