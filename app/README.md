@@ -3,6 +3,8 @@
 Mobile-first PWA (Next.js 16, Tailwind 4, MapLibre) that shows severe storms in
 O'Higgins, Chile, in near real time. The UI is in Spanish.
 
+Live: https://storm-alert-one.vercel.app
+
 It reads `status.json`, which the Python pipeline in
 [`research/requinoa-2026`](../research/requinoa-2026) publishes to GitHub Pages
 every 10 minutes from GOES-19 cloud tops and lightning. The app has no backend
