@@ -153,5 +153,7 @@ export default function StormMap({ status, place, onPick }: Props) {
   useEffect(syncStorm, [status]);
   useEffect(syncPlace, [place]);
 
-  return <div ref={container} className="absolute inset-0" role="application" aria-label="Mapa de tormentas" />;
+  // Sized, not positioned: maplibre-gl.css sets `position: relative` on the container and,
+  // being unlayered CSS, beats Tailwind's `absolute inset-0`, which left the map 0 px tall.
+  return <div ref={container} className="size-full" role="application" aria-label="Mapa de tormentas" />;
 }
