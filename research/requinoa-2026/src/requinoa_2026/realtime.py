@@ -20,9 +20,9 @@ import s3fs
 import xarray as xr
 
 from requinoa_2026.config import DATA_DIR, EVENT_LAT, EVENT_LON
-from requinoa_2026.false_alarms import COLD_TOP_C, RADIUS_KM, alert_times
+from requinoa_2026.false_alarms import COLD_TOP_C, RADIUS_KM, alert_times, episodes
 from requinoa_2026.goes import hourly_keys, read_abi_crop, read_glm_flashes, scan_start, with_retries
-from requinoa_2026.satellite_analysis import GLM_BIN, cloud_top_series, flash_counts, parallax_correct
+from requinoa_2026.satellite_analysis import GLM_BIN, cloud_top_series, flash_counts, lightning_jumps, parallax_correct
 
 OUT_DIR = DATA_DIR / "realtime"
 # The jump test needs 5 bins of history, the tested bin and one more for the
@@ -83,13 +83,15 @@ def map_layers(abi: xr.Dataset, flashes: pd.DataFrame, data_end: pd.Timestamp) -
     return {"cold_pixels": cold_pixels, "recent_flashes": recent[["lat", "lon"]].round(3).values.tolist()}
 
 
-def run_once(at: datetime, fs: s3fs.S3FileSystem) -> dict:
+def run_once(at: datetime, fs: s3fs.S3FileSystem, lookback: timedelta = LOOKBACK) -> dict:
     fs.invalidate_cache()  # s3fs caches listings; new files arrive every 20 s
-    start = at - LOOKBACK
+    start = at - lookback
     abi, flashes, data_end = fetch(start, at, fs)
     tops = cloud_top_series(abi, radius_km=RADIUS_KM)
     counts = complete_bins(flashes, pd.Timestamp(start), data_end)
     level, alerts = classify(tops, counts, data_end)
+    jumps = lightning_jumps(counts)
+    episode_start = episodes(alert_times(tops, counts))[-1] if level == "severe" else None
 
     latest = tops.iloc[-1]
     status = {
@@ -97,12 +99,18 @@ def run_once(at: datetime, fs: s3fs.S3FileSystem) -> dict:
         "data_until_utc": data_end.isoformat(),
         "level": level,
         "alerts_utc": [t.isoformat() for t in alerts],
+        "episode_start_utc": episode_start.isoformat() if episode_start is not None else None,
         "latest_scan_utc": latest.time.isoformat(),
         "coldest_top_c": round(float(latest.min_bt_c), 1),
         "coldest_km_from_requinoa": round(float(latest.coldest_km_from_requinoa), 1),
         "radius_km": RADIUS_KM,
         "center": [EVENT_LAT, EVENT_LON],
-        "flashes_per_5min": [{"start_utc": t.isoformat(), "count": int(c)} for t, c in counts.tail(6).items()],
+        "flashes_per_5min": [
+            {"start_utc": t.isoformat(), "count": int(c), "jump": bool(jumps[t])} for t, c in counts.items()
+        ],
+        "cloud_tops": [
+            {"time_utc": row.time.isoformat(), "min_bt_c": round(float(row.min_bt_c), 1)} for row in tops.itertuples()
+        ],
         **map_layers(abi, flashes, data_end),
     }
     OUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -120,11 +128,12 @@ def main(argv: list[str] | None = None) -> None:
     group = parser.add_mutually_exclusive_group()
     group.add_argument("--loop", action="store_true", help=f"repeat every {CYCLE_S // 60} minutes")
     group.add_argument("--at", help="replay a past UTC time, e.g. 2026-10-26T19:50")
+    parser.add_argument("--lookback-min", type=int, default=int(LOOKBACK.total_seconds() // 60), help="history to include")
     args = parser.parse_args(argv)
 
     fs = s3fs.S3FileSystem(anon=True)
     if args.at:
-        run_once(datetime.fromisoformat(args.at).replace(tzinfo=timezone.utc), fs)
+        run_once(datetime.fromisoformat(args.at).replace(tzinfo=timezone.utc), fs, timedelta(minutes=args.lookback_min))
     elif not args.loop:
         # A single run must fail loudly so a scheduler never publishes a stale page.
         run_once(datetime.now(timezone.utc), fs)
@@ -177,7 +186,7 @@ const labels = {
 const level = document.getElementById("level");
 level.textContent = labels[s.level];
 level.className = s.level;
-const counts = s.flashes_per_5min.map(b => b.count).join(" · ");
+const counts = s.flashes_per_5min.slice(-6).map(b => b.count).join(" · ");
 const localTime = new Date(s.data_until_utc).toLocaleString("es-CL",
   { timeZone: "America/Santiago", dateStyle: "short", timeStyle: "short" });
 document.getElementById("meta").textContent =

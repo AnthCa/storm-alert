@@ -1,0 +1,53 @@
+@import "tailwindcss";
+
+/* The app is dark by design: lightning and storm cores read best on a night background. */
+@theme {
+  --color-bg: #0e1116;
+  --color-surface: #161b22;
+  --color-surface-2: #1e242d;
+  --color-line: #2a313b;
+  --color-fg: #e8eaed;
+  --color-soft: #c3cad3;
+  --color-muted: #a3adba;
+  --color-quiet: #8cc8ff;
+  --color-quiet-bg: #12283d;
+  --color-quiet-line: #24486b;
+  --color-convective: #f2a53a;
+  --color-severe: #ff8a7a;
+  --color-severe-strong: #c73a2c;
+  --color-severe-bg: #3a1512;
+  --color-accent: #2f80ed;
+  --color-bolt: #ffe14d;
+  --font-sans: var(--font-plex-sans);
+  --font-mono: var(--font-plex-mono);
+}
+
+html,
+body {
+  background: var(--color-bg);
+  color: var(--color-fg);
+}
+
+/* Map markers are plain DOM elements created by MapLibre. */
+.me-marker {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  border: 3px solid #fff;
+  box-sizing: border-box;
+  box-shadow: 0 0 0 6px rgb(47 128 237 / 0.25);
+  cursor: grab;
+}
+
+.requinoa-marker {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  background: var(--color-fg);
+  transform: rotate(45deg);
+}
+
+.maplibregl-ctrl-attrib {
+  font-size: 10px;
+}

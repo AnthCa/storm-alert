@@ -1,0 +1,182 @@
+"use client";
+
+import { useStoredValue } from "@/lib/browser-store";
+import { BoltIcon, CheckIcon, LockIcon, LocateIcon, PinIcon } from "./Icons";
+import { PageShell } from "./PageShell";
+
+const SETTINGS_KEY = "storm-alert:alert-settings";
+const RADII = [10, 25, 50] as const;
+type Radius = (typeof RADII)[number];
+
+const RADIUS_HINT: Record<Radius, string> = {
+  10: "Solo tormentas casi encima. Menos avisos.",
+  25: "Recomendado: tiempo suficiente para prepararte.",
+  50: "Toda la zona. Más avisos, algunos lejanos.",
+};
+
+interface Settings {
+  radius: Radius;
+  where: "gps" | "commune";
+  clouds: boolean;
+  allClear: boolean;
+}
+
+const DEFAULTS: Settings = { radius: 25, where: "gps", clouds: false, allClear: false };
+
+export function AlertsSettings() {
+  const [stored, setStored] = useStoredValue<Partial<Settings>>(SETTINGS_KEY, DEFAULTS);
+  const settings: Settings = { ...DEFAULTS, ...stored };
+  const update = (patch: Partial<Settings>) => setStored({ ...settings, ...patch });
+
+  return (
+    <PageShell
+      title="Avisos en tu celular"
+      intro="Te avisaremos cuando una tormenta severa se acerque a tu ubicación, aunque no tengas la app abierta."
+    >
+      <section className="flex flex-col gap-2">
+        <h2 className="text-xs tracking-wider text-muted">ASÍ SE VERÁ UN AVISO</h2>
+        <div className="flex items-start gap-3 rounded-[18px] bg-[#e9ecf0] px-3.5 py-3 text-[#14181d]">
+          <div className="flex size-[38px] shrink-0 items-center justify-center rounded-[9px] bg-bg text-bolt">
+            <BoltIcon />
+          </div>
+          <div className="flex grow flex-col gap-0.5">
+            <div className="flex justify-between text-xs text-[#4a535e]">
+              <span>STORM ALERT</span>
+              <span>ahora</span>
+            </div>
+            <div className="text-[15px] font-semibold">Tormenta severa a 13 km al sur</div>
+            <div className="text-sm text-[#2e353d]">Posible granizo o viento fuerte. Busca refugio.</div>
+          </div>
+        </div>
+      </section>
+
+      <fieldset className="flex flex-col gap-2.5" role="radiogroup">
+        <legend className="mb-2.5 text-[17px] font-semibold">Dónde</legend>
+        <Choice
+          selected={settings.where === "gps"}
+          onSelect={() => update({ where: "gps" })}
+          icon={<LocateIcon size={20} />}
+          title="Usar mi ubicación"
+          detail="Se actualiza cuando te mueves"
+        />
+        <Choice
+          selected={settings.where === "commune"}
+          onSelect={() => update({ where: "commune" })}
+          icon={<PinIcon size={20} />}
+          title="Elegir una comuna"
+          detail="Por ejemplo, donde vive tu familia"
+        />
+      </fieldset>
+
+      <fieldset className="flex flex-col gap-2.5">
+        <legend className="mb-2.5 text-[17px] font-semibold">Avisarme si la tormenta está a menos de</legend>
+        <div className="grid grid-cols-3 gap-2">
+          {RADII.map((km) => {
+            const on = settings.radius === km;
+            return (
+              <button
+                key={km}
+                type="button"
+                aria-pressed={on}
+                onClick={() => update({ radius: km })}
+                className={`min-h-12 rounded-xl text-[15px] font-semibold ${on ? "bg-accent text-white" : "border border-line bg-surface"}`}
+              >
+                {km} km
+              </button>
+            );
+          })}
+        </div>
+        <p className="text-[13px] text-muted">{RADIUS_HINT[settings.radius]}</p>
+      </fieldset>
+
+      <fieldset className="flex flex-col">
+        <legend className="mb-1.5 text-[17px] font-semibold">Qué avisos quieres</legend>
+        <Toggle checked disabled title="Tormenta severa cerca" detail="Siempre activo" />
+        <Toggle
+          checked={settings.clouds}
+          onChange={(clouds) => update({ clouds })}
+          title="Nubes de tormenta cerca"
+          detail="Aviso temprano, más frecuente"
+        />
+        <Toggle
+          checked={settings.allClear}
+          onChange={(allClear) => update({ allClear })}
+          title="Aviso de fin de la tormenta"
+          detail="Cuando ya no hay actividad cerca"
+          last
+        />
+      </fieldset>
+
+      <p className="flex items-start gap-2.5 text-[13px] leading-relaxed text-soft">
+        <LockIcon size={18} className="mt-0.5 shrink-0 text-quiet" />
+        Guardaremos solo una ubicación aproximada, al kilómetro, para saber cuándo avisarte. No la compartimos con
+        nadie y podrás borrarla cuando quieras.
+      </p>
+
+      <div className="flex flex-col gap-2">
+        <button
+          type="button"
+          disabled
+          className="min-h-13 rounded-2xl bg-accent font-semibold text-white disabled:opacity-60"
+        >
+          Activar avisos
+        </button>
+        <p className="text-center text-[13px] text-muted">
+          Próximamente. Tus preferencias ya quedan guardadas en este dispositivo.
+        </p>
+      </div>
+    </PageShell>
+  );
+}
+
+function Choice(props: {
+  selected: boolean;
+  onSelect: () => void;
+  icon: React.ReactNode;
+  title: string;
+  detail: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={props.selected}
+      onClick={props.onSelect}
+      className={`flex min-h-14 items-center gap-3 rounded-2xl px-3.5 text-left ${
+        props.selected ? "border-[1.5px] border-accent bg-quiet-bg" : "border border-line bg-surface"
+      }`}
+    >
+      <span className={props.selected ? "text-quiet" : "text-muted"}>{props.icon}</span>
+      <span className="flex grow flex-col">
+        <span className="text-[15px]">{props.title}</span>
+        <span className="text-[13px] text-muted">{props.detail}</span>
+      </span>
+      {props.selected && <CheckIcon size={20} className="text-quiet" />}
+    </button>
+  );
+}
+
+function Toggle(props: {
+  checked: boolean;
+  disabled?: boolean;
+  onChange?: (checked: boolean) => void;
+  title: string;
+  detail: string;
+  last?: boolean;
+}) {
+  return (
+    <label className={`flex min-h-14 items-center gap-3 ${props.last ? "" : "border-b border-line"}`}>
+      <input
+        type="checkbox"
+        checked={props.checked}
+        disabled={props.disabled}
+        onChange={(e) => props.onChange?.(e.target.checked)}
+        className="size-5.5 accent-accent"
+      />
+      <span className="flex flex-col">
+        <span className="text-[15px]">{props.title}</span>
+        <span className="text-[13px] text-muted">{props.detail}</span>
+      </span>
+    </label>
+  );
+}
