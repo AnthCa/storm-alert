@@ -1,7 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { useStoredValue } from "@/lib/browser-store";
 import { BoltIcon, CheckIcon, LockIcon, LocateIcon, PinIcon } from "./Icons";
+import { Note } from "./PageShell";
 import { PageShell } from "./PageShell";
 
 const SETTINGS_KEY = "storm-alert:alert-settings";
@@ -16,12 +18,12 @@ const RADIUS_HINT: Record<Radius, string> = {
 
 interface Settings {
   radius: Radius;
-  where: "gps" | "commune";
+  where: "point" | "commune";
   clouds: boolean;
   allClear: boolean;
 }
 
-const DEFAULTS: Settings = { radius: 25, where: "gps", clouds: false, allClear: false };
+const DEFAULTS: Settings = { radius: 25, where: "commune", clouds: false, allClear: false };
 
 export function AlertsSettings() {
   const [stored, setStored] = useStoredValue<Partial<Settings>>(SETTINGS_KEY, DEFAULTS);
@@ -30,11 +32,16 @@ export function AlertsSettings() {
 
   return (
     <PageShell
-      title="Avisos en tu celular"
-      intro="Te avisaremos cuando una tormenta severa se acerque a tu ubicación, aunque no tengas la app abierta."
+      title="Notificaciones"
+      intro="Cuando estén listas, te avisaremos si observamos actividad convectiva intensa cerca de ti, aunque no tengas la app abierta."
     >
+      <Note title="Todavía no enviamos notificaciones">
+        Las estamos preparando. Puedes dejar listas tus preferencias: quedan guardadas solo en este dispositivo. Las
+        notificaciones de Storm Alert serán observaciones experimentales y no reemplazan los avisos oficiales.
+      </Note>
+
       <section className="flex flex-col gap-2">
-        <h2 className="text-xs tracking-wider text-muted">ASÍ SE VERÁ UN AVISO</h2>
+        <h2 className="text-xs tracking-wider text-muted">ASÍ SE VERÁ UNA NOTIFICACIÓN</h2>
         <div className="flex items-start gap-3 rounded-[18px] bg-[#e9ecf0] px-3.5 py-3 text-[#14181d]">
           <div className="flex size-[38px] shrink-0 items-center justify-center rounded-[9px] bg-bg text-bolt">
             <BoltIcon />
@@ -44,8 +51,10 @@ export function AlertsSettings() {
               <span>STORM ALERT</span>
               <span>ahora</span>
             </div>
-            <div className="text-[15px] font-semibold">Tormenta severa a 13 km al sur</div>
-            <div className="text-sm text-[#2e353d]">Posible granizo o viento fuerte. Busca refugio.</div>
+            <div className="text-[15px] font-semibold">Actividad convectiva intensa cerca de Rengo</div>
+            <div className="text-sm text-[#2e353d]">
+              Observada a 18 km, a las 17:40. Sistema experimental; revisa los avisos de la DMC y SENAPRED.
+            </div>
           </div>
         </div>
       </section>
@@ -53,23 +62,23 @@ export function AlertsSettings() {
       <fieldset className="flex flex-col gap-2.5" role="radiogroup">
         <legend className="mb-2.5 text-[17px] font-semibold">Dónde</legend>
         <Choice
-          selected={settings.where === "gps"}
-          onSelect={() => update({ where: "gps" })}
-          icon={<LocateIcon size={20} />}
-          title="Usar mi ubicación"
-          detail="Se actualiza cuando te mueves"
-        />
-        <Choice
           selected={settings.where === "commune"}
           onSelect={() => update({ where: "commune" })}
           icon={<PinIcon size={20} />}
-          title="Elegir una comuna"
-          detail="Por ejemplo, donde vive tu familia"
+          title="Una comuna"
+          detail="La tuya o la de tu familia. No usa GPS."
+        />
+        <Choice
+          selected={settings.where === "point"}
+          onSelect={() => update({ where: "point" })}
+          icon={<LocateIcon size={20} />}
+          title="Un punto fijo"
+          detail="Tu ubicación de hoy, redondeada a ~1 km. No te sigue."
         />
       </fieldset>
 
       <fieldset className="flex flex-col gap-2.5">
-        <legend className="mb-2.5 text-[17px] font-semibold">Avisarme si la tormenta está a menos de</legend>
+        <legend className="mb-2.5 text-[17px] font-semibold">Notificarme si la actividad está a menos de</legend>
         <div className="grid grid-cols-3 gap-2">
           {RADII.map((km) => {
             const on = settings.radius === km;
@@ -90,27 +99,32 @@ export function AlertsSettings() {
       </fieldset>
 
       <fieldset className="flex flex-col">
-        <legend className="mb-1.5 text-[17px] font-semibold">Qué avisos quieres</legend>
-        <Toggle checked disabled title="Tormenta severa cerca" detail="Siempre activo" />
+        <legend className="mb-1.5 text-[17px] font-semibold">Qué notificaciones quieres</legend>
+        <Toggle checked disabled title="Actividad convectiva intensa cerca" detail="Siempre activo" />
         <Toggle
           checked={settings.clouds}
           onChange={(clouds) => update({ clouds })}
           title="Nubes de tormenta cerca"
-          detail="Aviso temprano, más frecuente"
+          detail="Más temprano y más frecuente"
         />
         <Toggle
           checked={settings.allClear}
           onChange={(allClear) => update({ allClear })}
-          title="Aviso de fin de la tormenta"
-          detail="Cuando ya no hay actividad cerca"
+          title="Fin de la actividad"
+          detail="Solo con datos completos que lo confirmen"
           last
         />
       </fieldset>
 
       <p className="flex items-start gap-2.5 text-[13px] leading-relaxed text-soft">
         <LockIcon size={18} className="mt-0.5 shrink-0 text-quiet" />
-        Guardaremos solo una ubicación aproximada, al kilómetro, para saber cuándo avisarte. No la compartimos con
-        nadie y podrás borrarla cuando quieras.
+        <span>
+          Guardaremos solo tu comuna o un punto aproximado (~1 km) para saber cuándo avisarte. No la compartimos con
+          nadie y podrás borrarla cuando quieras.{" "}
+          <Link href="/privacidad" className="text-quiet underline">
+            Política de privacidad
+          </Link>
+        </span>
       </p>
 
       <div className="flex flex-col gap-2">
@@ -122,7 +136,7 @@ export function AlertsSettings() {
           Activar avisos
         </button>
         <p className="text-center text-[13px] text-muted">
-          Próximamente. Tus preferencias ya quedan guardadas en este dispositivo.
+          Disponible pronto. En iPhone, para recibirlas deberás agregar la app a la pantalla de inicio.
         </p>
       </div>
     </PageShell>

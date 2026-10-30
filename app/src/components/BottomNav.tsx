@@ -2,19 +2,20 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BellIcon, InfoIcon, MapIcon } from "./Icons";
+import { BellIcon, InfoIcon, MapIcon, ShieldIcon } from "./Icons";
 
 const ITEMS = [
   { href: "/", label: "Mapa", Icon: MapIcon },
-  { href: "/avisos", label: "Avisos", Icon: BellIcon },
-  { href: "/como-funciona", label: "Cómo funciona", Icon: InfoIcon },
+  { href: "/oficiales", label: "Oficiales", Icon: ShieldIcon },
+  { href: "/notificaciones", label: "Notificaciones", Icon: BellIcon },
+  { href: "/como-funciona", label: "Info", Icon: InfoIcon },
 ] as const;
 
 export function BottomNav() {
   const pathname = usePathname();
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-20 grid grid-cols-3 border-t border-line bg-bg pb-[env(safe-area-inset-bottom)]"
+      className="fixed inset-x-0 bottom-0 z-20 grid grid-cols-4 border-t border-line bg-bg pb-[env(safe-area-inset-bottom)]"
       aria-label="Principal"
     >
       {ITEMS.map(({ href, label, Icon }) => {

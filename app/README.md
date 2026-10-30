@@ -12,10 +12,16 @@ of its own yet.
 
 | Screen | Route |
 |---|---|
-| Live map, regional status and "your location" | `/` |
-| Alert detail: lightning and cloud-top history, what to do | `/alerta` |
-| Notification preferences (push delivery is not built yet) | `/avisos` |
+| Live map, data state, monitored area and "your location" | `/` |
+| Observation detail: lightning and cloud-top history | `/observacion` |
+| Official sources (DMC, SENAPRED) and how they differ from observations | `/oficiales` |
+| Notification preferences (push delivery is not built yet) | `/notificaciones` |
 | How it works, with the Requínoa tornado case | `/como-funciona` |
+| Privacy policy | `/privacidad` |
+
+Storm Alert shows **experimental observations**, never official alerts. Missing
+or late data is shown as such (`degraded`, `stale`, `offline`), never as "no
+storms", and nothing local is computed outside the monitored 50 km circle.
 
 `/?demo=requinoa` replays 26 Oct 2026 at 17:30 local time, when the tornado
 touched down (`public/demo/requinoa-2026-10-26.json`).

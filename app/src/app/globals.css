@@ -16,7 +16,7 @@
   --color-severe: #ff8a7a;
   --color-severe-strong: #c73a2c;
   --color-severe-bg: #3a1512;
-  --color-accent: #2f80ed;
+  --color-accent: #1f6bd1; /* white text on it: 5.1:1 (AA) */
   --color-bolt: #ffe14d;
   --font-sans: var(--font-plex-sans);
   --font-mono: var(--font-plex-mono);
@@ -36,7 +36,7 @@ body {
   background: var(--color-accent);
   border: 3px solid #fff;
   box-sizing: border-box;
-  box-shadow: 0 0 0 6px rgb(47 128 237 / 0.25);
+  box-shadow: 0 0 0 6px rgb(31 107 209 / 0.3);
   cursor: grab;
 }
 
@@ -50,4 +50,19 @@ body {
 
 .maplibregl-ctrl-attrib {
   font-size: 10px;
+}
+
+/* Keyboard focus must always be visible (WCAG 2.4.7). */
+:focus-visible {
+  outline: 2px solid var(--color-quiet);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }
