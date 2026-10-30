@@ -1,0 +1,40 @@
+[project]
+name = "requinoa-2026"
+version = "0.1.0"
+description = "Case study: was the Requinoa tornado (2026-10-26) environment visible in GFS forecasts?"
+readme = "README.md"
+authors = [
+    { name = "Anthony Canales", email = "anthonycca8@gmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "cartopy>=0.26.0",
+    "cfgrib>=0.9.15.1",
+    "h5netcdf>=1.8.2",
+    "h5py>=3.16.0",
+    "herbie-data>=2026.10.0",
+    "jupyterlab>=4.6.5",
+    "matplotlib>=3.11.2",
+    "metpy>=1.7.1",
+    "netcdf4>=1.7.5.1.post1",
+    "pyproj>=3.8.0",
+    "s3fs>=2026.9.0",
+    "xarray>=2026.9.0",
+]
+
+[project.scripts]
+requinoa-download = "requinoa_2026.download:main"
+requinoa-analyze = "requinoa_2026.analyze:main"
+requinoa-goes = "requinoa_2026.goes:main"
+requinoa-satellite = "requinoa_2026.satellite_analysis:main"
+requinoa-false-alarms = "requinoa_2026.false_alarms:main"
+requinoa-realtime = "requinoa_2026.realtime:main"
+
+[build-system]
+requires = ["uv_build>=0.13.6,<0.14.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.2.0",
+]
