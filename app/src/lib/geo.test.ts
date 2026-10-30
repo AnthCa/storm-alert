@@ -1,12 +1,20 @@
 import { describe, expect, it } from "vitest";
-import { activityAt, circleRing, direction, distanceKm, nearestTown } from "./geo";
-import { normalizeStatus, type Status } from "./status";
+import { activityAt, circleRing, coarsen, direction, distanceKm, nearestTown } from "./geo";
+import { dataState, normalizeStatus, type Status } from "./status";
 
 const REQUINOA: [number, number] = [-34.29, -70.82];
 const RANCAGUA: [number, number] = [-34.17, -70.74];
 
 function status(overrides: Partial<Status> = {}): Status {
   return {
+    schema_version: 2,
+    algorithm_version: "2026.10-r1",
+    health: {
+      state: "healthy",
+      problems: [],
+      abi: { expected: 3, received: 3, latest_utc: "2026-10-26T20:20:20+00:00" },
+      glm: { expected_files: 135, received_files: 135, latest_utc: "2026-10-26T20:30:00+00:00" },
+    },
     generated_utc: "2026-10-26T20:31:00+00:00",
     data_until_utc: "2026-10-26T20:30:00+00:00",
     level: "severe",
@@ -66,8 +74,10 @@ describe("activityAt", () => {
     expect(a.flashesNear).toBe(1);
   });
 
-  it("flags points outside the validated 50 km circle", () => {
-    expect(activityAt(status(), -34.39, -72.0).insideValidatedArea).toBe(false);
+  it("computes no local state outside the monitored circle", () => {
+    const pichilemu = activityAt(status({ recent_flashes: [[-34.39, -72.0]] }), -34.39, -72.0);
+    expect(pichilemu.insideValidatedArea).toBe(false);
+    expect(pichilemu.level).toBe("outside");
     expect(activityAt(status(), ...RANCAGUA).insideValidatedArea).toBe(true);
   });
 });
@@ -87,7 +97,39 @@ describe("normalizeStatus", () => {
       flashes_per_5min: [{ start_utc: "2026-10-30T00:40:00+00:00", count: 0 } as never],
     });
     expect(s.cloud_tops).toEqual([]);
+    expect(s.level).toBe("unknown"); // no health report: quiet cannot be confirmed
     expect(s.episode_start_utc).toBeNull();
     expect(s.flashes_per_5min[0].jump).toBe(false);
+  });
+});
+
+describe("coarsen", () => {
+  it("keeps about 1 km of precision", () => {
+    expect(coarsen(-34.16543)).toBe(-34.17);
+    expect(distanceKm(-34.16543, -70.74219, coarsen(-34.16543), coarsen(-70.74219))).toBeLessThan(1);
+  });
+});
+
+describe("dataState", () => {
+  const now = new Date("2026-10-26T20:40:00Z");
+  it("is healthy only with complete, recent data", () => {
+    expect(dataState(status({ data_until_utc: "2026-10-26T20:35:00Z" }), { demo: false, online: true, now })).toBe(
+      "healthy",
+    );
+  });
+  it("flags old data as stale", () => {
+    expect(dataState(status({ data_until_utc: "2026-10-26T20:00:00Z" }), { demo: false, online: true, now })).toBe(
+      "stale",
+    );
+  });
+  it("reports pipeline gaps as degraded", () => {
+    const degraded = status({ data_until_utc: "2026-10-26T20:35:00Z" });
+    degraded.health = { ...degraded.health, state: "degraded", problems: ["glm_incomplete"] };
+    expect(dataState(degraded, { demo: false, online: true, now })).toBe("degraded");
+  });
+  it("never presents cached data as current while offline, and marks the replay as historical", () => {
+    expect(dataState(status(), { demo: false, online: false, now })).toBe("offline");
+    expect(dataState(status(), { demo: true, online: true, now })).toBe("historical");
+    expect(dataState(null, { demo: false, online: true, now })).toBe("unavailable");
   });
 });

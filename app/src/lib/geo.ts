@@ -39,7 +39,8 @@ export function circleRing(lat: number, lon: number, radiusKm: number, steps = 9
   return ring;
 }
 
-export type LocalLevel = "over" | "near" | "clear";
+/** "outside": beyond the monitored circle, where no local state is computed at all. */
+export type LocalLevel = "over" | "near" | "clear" | "outside";
 
 export interface Activity {
   level: LocalLevel;
@@ -69,16 +70,21 @@ export function activityAt(status: Status, lat: number, lon: number): Activity {
   }
 
   const found = nearest as Activity["nearest"];
-  const level: LocalLevel =
-    flashesNear > 0 || (found && found.km <= 5) ? "over" : found && found.km <= AROUND_KM ? "near" : "clear";
   const [centerLat, centerLon] = status.center;
-  return {
-    level,
-    flashesNear,
-    nearest: found,
-    coldestAroundC,
-    insideValidatedArea: distanceKm(lat, lon, centerLat, centerLon) <= status.radius_km,
-  };
+  const insideValidatedArea = distanceKm(lat, lon, centerLat, centerLon) <= status.radius_km;
+  const level: LocalLevel = !insideValidatedArea
+    ? "outside"
+    : flashesNear > 0 || (found && found.km <= 5)
+      ? "over"
+      : found && found.km <= AROUND_KM
+        ? "near"
+        : "clear";
+  return { level, flashesNear, nearest: found, coldestAroundC, insideValidatedArea };
+}
+
+/** Two decimals is about 1 km: enough to measure distance to a storm, too coarse to find a home. */
+export function coarsen(value: number): number {
+  return Math.round(value * 100) / 100;
 }
 
 /** Main towns of O'Higgins, to name the area around a point. Approximate centres. */

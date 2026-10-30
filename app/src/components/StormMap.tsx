@@ -24,11 +24,28 @@ const ring = (lat: number, lon: number, km: number): Feature => ({
   properties: {},
 });
 
+/** Everything outside the monitored circle, drawn as a dim mask: a polygon with the circle as its hole. */
+function outsideMask(lat: number, lon: number, km: number): Feature {
+  const world: [number, number][] = [
+    [-180, -85],
+    [180, -85],
+    [180, 85],
+    [-180, 85],
+    [-180, -85],
+  ];
+  return {
+    type: "Feature",
+    geometry: { type: "Polygon", coordinates: [world, circleRing(lat, lon, km).reverse()] },
+    properties: {},
+  };
+}
+
 function stormData(status: Status | null) {
   return {
     cold: collection((status?.cold_pixels ?? []).map(([lat, lon, t]) => point(lat, lon, { t }))),
     flashes: collection((status?.recent_flashes ?? []).map(([lat, lon]) => point(lat, lon))),
     area: collection(status ? [ring(status.center[0], status.center[1], status.radius_km)] : []),
+    outside: collection(status ? [outsideMask(status.center[0], status.center[1], status.radius_km)] : []),
   };
 }
 
@@ -42,9 +59,11 @@ interface Props {
   status: Status | null;
   place: Place | null;
   onPick: (lat: number, lon: number) => void;
+  /** Id of the text that summarises the map for screen readers. */
+  summaryId: string;
 }
 
-export default function StormMap({ status, place, onPick }: Props) {
+export default function StormMap({ status, place, onPick, summaryId }: Props) {
   const container = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
   const me = useRef<maplibregl.Marker | null>(null);
@@ -67,11 +86,18 @@ export default function StormMap({ status, place, onPick }: Props) {
 
     m.on("load", () => {
       const data = stormData(latest.current.status);
+      m.addSource("outside", { type: "geojson", data: data.outside });
       m.addSource("area", { type: "geojson", data: data.area });
       m.addSource("cold", { type: "geojson", data: data.cold });
       m.addSource("flashes", { type: "geojson", data: data.flashes });
       m.addSource("me-ring", { type: "geojson", data: collection([]) });
 
+      m.addLayer({
+        id: "outside",
+        type: "fill",
+        source: "outside",
+        paint: { "fill-color": "#0e1116", "fill-opacity": 0.55 },
+      });
       m.addLayer({
         id: "area",
         type: "line",
@@ -123,6 +149,7 @@ export default function StormMap({ status, place, onPick }: Props) {
     const m = map.current;
     if (!m || !ready.current) return;
     const data = stormData(latest.current.status);
+    (m.getSource("outside") as GeoJSONSource).setData(data.outside);
     (m.getSource("area") as GeoJSONSource).setData(data.area);
     (m.getSource("cold") as GeoJSONSource).setData(data.cold);
     (m.getSource("flashes") as GeoJSONSource).setData(data.flashes);
@@ -147,7 +174,10 @@ export default function StormMap({ status, place, onPick }: Props) {
     }
     me.current.setLngLat([p.lon, p.lat]);
     (m.getSource("me-ring") as GeoJSONSource).setData(collection([ring(p.lat, p.lon, NEAR_KM)]));
-    if (p.source === "gps") m.easeTo({ center: [p.lon, p.lat], zoom: Math.max(m.getZoom(), 9) });
+    if (p.source === "gps") {
+      const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      m.easeTo({ center: [p.lon, p.lat], zoom: Math.max(m.getZoom(), 9), duration: reduceMotion ? 0 : 800 });
+    }
   }
 
   useEffect(syncStorm, [status]);
@@ -155,5 +185,14 @@ export default function StormMap({ status, place, onPick }: Props) {
 
   // Sized, not positioned: maplibre-gl.css sets `position: relative` on the container and,
   // being unlayered CSS, beats Tailwind's `absolute inset-0`, which left the map 0 px tall.
-  return <div ref={container} className="size-full" role="application" aria-label="Mapa de tormentas" />;
+  // The map is visual; its content is summarised in text (summaryId) for screen readers.
+  return (
+    <div
+      ref={container}
+      className="size-full"
+      role="region"
+      aria-label="Mapa de actividad convectiva. Toca para marcar tu ubicación."
+      aria-describedby={summaryId}
+    />
+  );
 }

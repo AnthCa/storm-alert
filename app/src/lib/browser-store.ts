@@ -51,7 +51,8 @@ export function useStoredValue<T>(key: string, fallback: T, area: Area = "local"
   const setValue = useCallback(
     (next: T) => {
       try {
-        storage(area).setItem(key, JSON.stringify(next));
+        if (next === null) storage(area).removeItem(key);
+        else storage(area).setItem(key, JSON.stringify(next));
       } catch {
         // The value just won't persist.
       }
@@ -60,4 +61,43 @@ export function useStoredValue<T>(key: string, fallback: T, area: Area = "local"
     [key, area],
   );
   return [value, setValue];
+}
+
+function subscribeOnline(listener: () => void) {
+  window.addEventListener("online", listener);
+  window.addEventListener("offline", listener);
+  return () => {
+    window.removeEventListener("online", listener);
+    window.removeEventListener("offline", listener);
+  };
+}
+
+/** navigator.onLine, assumed true on the server. */
+export function useOnline(): boolean {
+  return useSyncExternalStore(
+    subscribeOnline,
+    () => navigator.onLine,
+    () => true,
+  );
+}
+
+// One shared clock, so "hace 8 min" and staleness keep updating while the app stays open.
+const CLOCK_MS = 30_000;
+let clockNow = 0;
+function subscribeClock(listener: () => void) {
+  clockNow = Date.now();
+  const timer = setInterval(() => {
+    clockNow = Date.now();
+    listener();
+  }, CLOCK_MS);
+  return () => clearInterval(timer);
+}
+
+/** Current time in ms, refreshed every 30 s; 0 on the server and during hydration. */
+export function useNow(): number {
+  return useSyncExternalStore(
+    subscribeClock,
+    () => clockNow,
+    () => 0,
+  );
 }

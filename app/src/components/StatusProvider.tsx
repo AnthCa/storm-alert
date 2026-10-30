@@ -1,7 +1,8 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
-import { useStoredValue } from "@/lib/browser-store";
+import { useOnline, useStoredValue } from "@/lib/browser-store";
+import { coarsen } from "@/lib/geo";
 import { DEMO_STATUS_URL, LIVE_STATUS_URL, fetchStatus, type Status } from "@/lib/status";
 
 const POLL_MS = 60_000;
@@ -21,8 +22,10 @@ interface StatusContextValue {
   error: string | null;
   demo: boolean;
   setDemo: (on: boolean) => void;
+  online: boolean;
   place: Place | null;
   setPlace: (place: Place) => void;
+  clearPlace: () => void;
   locate: () => Promise<LocateResult>;
 }
 
@@ -33,7 +36,16 @@ export function StatusProvider({ children }: { children: React.ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   // Demo mode lasts while the tab is open, so it survives navigating between screens.
   const [demo, setDemoFlag] = useStoredValue(DEMO_KEY, false, "session");
-  const [place, setPlace] = useStoredValue<Place | null>(LOCATION_KEY, null);
+  const [storedPlace, storePlace] = useStoredValue<Place | null>(LOCATION_KEY, null);
+  const online = useOnline();
+
+  // Only a ~1 km location is ever kept, on this device. Older precise values are coarsened on read.
+  const place = storedPlace && { ...storedPlace, lat: coarsen(storedPlace.lat), lon: coarsen(storedPlace.lon) };
+  const setPlace = useCallback(
+    (next: Place) => storePlace({ ...next, lat: coarsen(next.lat), lon: coarsen(next.lon) }),
+    [storePlace],
+  );
+  const clearPlace = useCallback(() => storePlace(null), [storePlace]);
 
   // A shared link like /?demo=requinoa opens straight into the demo.
   useEffect(() => {
@@ -84,7 +96,7 @@ export function StatusProvider({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <StatusContext.Provider value={{ status, error, demo, setDemo, place, setPlace, locate }}>
+    <StatusContext.Provider value={{ status, error, demo, setDemo, online, place, setPlace, clearPlace, locate }}>
       {children}
     </StatusContext.Provider>
   );
