@@ -1,6 +1,6 @@
 // Storm Alert service worker: lets the installed app open offline with the last data it saw.
-const CACHE = "storm-alert-v1";
-const SHELL = ["/", "/alerta", "/avisos", "/como-funciona", "/demo/requinoa-2026-10-26.json"];
+const CACHE = "storm-alert-v2";
+const SHELL = ["/", "/observacion", "/oficiales", "/notificaciones", "/como-funciona", "/privacidad", "/demo/requinoa-2026-10-26.json"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(SHELL)));
