@@ -1,5 +1,21 @@
 {
-  "generated_utc": "2026-10-30T01:04:08+00:00",
+  "schema_version": 2,
+  "algorithm_version": "2026.10-r1",
+  "generated_utc": "2026-10-30T02:09:34+00:00",
+  "health": {
+    "state": "healthy",
+    "problems": [],
+    "abi": {
+      "expected": 7,
+      "received": 8,
+      "latest_utc": "2026-10-26T20:20:20+00:00"
+    },
+    "glm": {
+      "expected_files": 240,
+      "received_files": 240,
+      "latest_utc": "2026-10-26T20:30:00+00:00"
+    }
+  },
   "data_until_utc": "2026-10-26T20:30:00+00:00",
   "level": "severe",
   "alerts_utc": [

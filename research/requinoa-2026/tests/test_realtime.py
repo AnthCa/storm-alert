@@ -1,6 +1,6 @@
 import pandas as pd
 
-from requinoa_2026.realtime import classify, complete_bins
+from requinoa_2026.realtime import classify, complete_bins, public_level, source_health
 from test_false_alarms import jumping_counts, tops, ts
 
 
@@ -25,8 +25,54 @@ def test_warm_tops_are_quiet():
     assert classify(tops(-30.0), jumping_counts(), at=ts("19:50"))[0] == "quiet"
 
 
+def glm_files(start: str, end: str, skip: tuple[str, ...] = ()) -> list[pd.Timestamp]:
+    """Start times of the 20-second GLM files in [start, end), minus `skip`."""
+    starts = pd.date_range(ts(start), ts(end), freq="20s", inclusive="left")
+    return [t for t in starts if t not in {ts(x) for x in skip}]
+
+
+EMPTY = pd.DataFrame(columns=["time", "lat", "lon"])
+
+
 def test_partial_bins_are_dropped():
-    empty = pd.DataFrame(columns=["time", "lat", "lon"])
-    counts = complete_bins(empty, ts("19:02"), ts("19:33:20"))
+    counts = complete_bins(EMPTY, ts("19:02"), ts("19:33:20"), glm_files("19:00", "19:33:20"))
     assert counts.index.tolist() == [ts("19:05"), ts("19:10"), ts("19:15"), ts("19:20"), ts("19:25")]
     assert counts.sum() == 0
+
+
+def test_bins_with_missing_glm_files_are_unknown_not_zero():
+    files = glm_files("19:00", "19:30", skip=("19:10:00", "19:10:20"))
+    counts = complete_bins(EMPTY, ts("19:00"), ts("19:30"), files)
+    assert counts.isna().tolist() == [False, False, True, False, False, False]
+
+
+def health_for(files: list[pd.Timestamp], abi_count: int = 3) -> dict:
+    abi = [ts("19:00:20") + i * pd.Timedelta("10min") for i in range(abi_count)]
+    counts = complete_bins(EMPTY, ts("19:00"), ts("19:35"), files)
+    return source_health(abi, files, counts, ts("19:00"), ts("19:35"))
+
+
+def test_complete_recent_data_is_healthy():
+    health = health_for(glm_files("19:00", "19:35"))
+    assert health["state"] == "healthy", health["problems"]
+    assert public_level("quiet", health) == "quiet"
+
+
+def test_glm_gap_degrades_and_quiet_becomes_unknown():
+    health = health_for(glm_files("19:00", "19:35", skip=("19:20:00", "19:20:20")))
+    assert health["state"] == "degraded"
+    assert "glm_incomplete" in health["problems"]
+    assert public_level("quiet", health) == "unknown"
+    assert public_level("severe", health) == "severe"
+
+
+def test_missing_abi_scan_degrades():
+    health = health_for(glm_files("19:00", "19:35"), abi_count=1)
+    assert "abi_incomplete" in health["problems"]
+
+
+def test_late_glm_degrades():
+    files = glm_files("19:00", "19:20")
+    counts = complete_bins(EMPTY, ts("19:00"), ts("19:20"), files)
+    health = source_health([ts("19:00:20"), ts("19:10:20"), ts("19:20:20")], files, counts, ts("19:00"), ts("19:35"))
+    assert "glm_late" in health["problems"]

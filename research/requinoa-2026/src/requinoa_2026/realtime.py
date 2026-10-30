@@ -32,9 +32,27 @@ LOOKBACK = timedelta(minutes=45)
 ALERT_MEMORY = pd.Timedelta("30min")
 CYCLE_S = 600
 
+SCHEMA_VERSION = 2
+# Bump whenever the alert rule or its thresholds change (see false_alarms.py).
+ALGORITHM_VERSION = "2026.10-r1"
+
+GLM_FILE_S = 20  # one GLM L2 file every 20 s
+ABI_SCAN = pd.Timedelta("10min")  # full disk every 10 min
+# A 5-minute bin with fewer GLM files than this has no flash count, never a zero.
+MIN_BIN_COVERAGE = 14 / 15
+# Beyond these delays the newest file is considered late.
+MAX_GLM_DELAY = pd.Timedelta("10min")
+MAX_ABI_DELAY = pd.Timedelta("25min")
+# The jump test reads the last 30 minutes, so gaps there make "quiet" unprovable.
+RECENT_BINS = 6
+
 
 def classify(tops: pd.DataFrame, counts: pd.Series, at: pd.Timestamp) -> tuple[str, list[pd.Timestamp]]:
-    """'severe' if the rule fired recently, 'deep_convection' if tops are cold, else 'quiet'."""
+    """'severe' if the rule fired recently, 'deep_convection' if tops are cold, else 'quiet'.
+
+    Bins without data (NaN) never produce a jump, so missing data can only hide an
+    alert, never create one; source_health() then stops that hiding from reading as quiet.
+    """
     alerts = [t for t in alert_times(tops, counts) if t >= at - ALERT_MEMORY]
     if alerts:
         return "severe", alerts
@@ -43,26 +61,88 @@ def classify(tops: pd.DataFrame, counts: pd.Series, at: pd.Timestamp) -> tuple[s
     return "quiet", []
 
 
-def complete_bins(flashes: pd.DataFrame, start: pd.Timestamp, data_end: pd.Timestamp) -> pd.Series:
-    """Zero-filled 5-minute flash counts near Requínoa, only for bins fully covered by data."""
+def bin_coverage(glm_starts: list[pd.Timestamp], bins: pd.DatetimeIndex) -> pd.Series:
+    """Fraction of the expected GLM files that arrived in each 5-minute bin."""
+    expected = pd.Timedelta(GLM_BIN).total_seconds() / GLM_FILE_S
+    received = pd.Series(1, index=pd.DatetimeIndex(glm_starts)).resample(GLM_BIN).sum()
+    return received.reindex(bins, fill_value=0) / expected
+
+
+def complete_bins(
+    flashes: pd.DataFrame, start: pd.Timestamp, data_end: pd.Timestamp, glm_starts: list[pd.Timestamp]
+) -> pd.Series:
+    """5-minute flash counts near Requínoa. A bin is zero only if its GLM files arrived;
+    a bin with missing files is NaN, because absent data is not absent lightning."""
     bins = pd.date_range(start.ceil(GLM_BIN), data_end.floor(GLM_BIN), freq=GLM_BIN, inclusive="left")
-    if flashes.empty:
-        return pd.Series(0, index=bins)
-    return flash_counts(flashes, radius_km=RADIUS_KM).reindex(bins, fill_value=0)
+    counts = pd.Series(0.0, index=bins)
+    if not flashes.empty:
+        counts = flash_counts(flashes, radius_km=RADIUS_KM).reindex(bins, fill_value=0).astype(float)
+    return counts.where(bin_coverage(glm_starts, bins) >= MIN_BIN_COVERAGE)
+
+
+def source_health(
+    abi_times: list[pd.Timestamp],
+    glm_starts: list[pd.Timestamp],
+    counts: pd.Series,
+    start: pd.Timestamp,
+    at: pd.Timestamp,
+) -> dict:
+    """Completeness and delay of each source, and an overall state:
+    healthy (complete and recent), degraded (gaps or late files) or unavailable (no data)."""
+    abi_expected = max(1, int((at - start) / ABI_SCAN) - 1)  # the newest scan may still be in transit
+    glm_expected = int((at - start).total_seconds() // GLM_FILE_S)
+    abi_latest = max(abi_times) if abi_times else None
+    glm_latest = max(glm_starts) + pd.Timedelta(seconds=GLM_FILE_S) if glm_starts else None
+
+    problems = []
+    if not abi_times or not glm_starts:
+        problems.append("missing_source")
+    if len(abi_times) < abi_expected:
+        problems.append("abi_incomplete")
+    if abi_latest is not None and at - abi_latest > MAX_ABI_DELAY:
+        problems.append("abi_late")
+    if glm_latest is not None and at - glm_latest > MAX_GLM_DELAY:
+        problems.append("glm_late")
+    if counts.tail(RECENT_BINS).isna().any() or len(counts) < RECENT_BINS:
+        problems.append("glm_incomplete")
+
+    state = "unavailable" if "missing_source" in problems else ("degraded" if problems else "healthy")
+    return {
+        "state": state,
+        "problems": problems,
+        "abi": {
+            "expected": abi_expected,
+            "received": len(abi_times),
+            "latest_utc": abi_latest.isoformat() if abi_latest is not None else None,
+        },
+        "glm": {
+            "expected_files": glm_expected,
+            "received_files": len(glm_starts),
+            "latest_utc": glm_latest.isoformat() if glm_latest is not None else None,
+        },
+    }
+
+
+def public_level(level: str, health: dict) -> str:
+    """Without complete data a quiet result is unproven, so it becomes 'unknown'.
+    Positive findings stand: they rest on data that did arrive."""
+    return "unknown" if level == "quiet" and health["state"] != "healthy" else level
 
 
 def fetch(start: datetime, end: datetime, fs: s3fs.S3FileSystem):
     abi_keys = hourly_keys("ABI-L2-CMIPF", start, end, fs, band="M6C13")
     glm_keys = hourly_keys("GLM-L2-LCFA", start, end, fs)
     if not abi_keys or not glm_keys:
+        # A single run exits non-zero here, so a scheduler never publishes an empty status.
         raise RuntimeError(f"no GOES-19 files between {start:%H:%M} and {end:%H:%M} UTC yet")
     with ThreadPoolExecutor(max_workers=12) as pool:
         crops = list(pool.map(lambda k: with_retries(read_abi_crop, k, fs), abi_keys))
         frames = list(pool.map(lambda k: with_retries(read_glm_flashes, k, fs), glm_keys))
     abi = xr.concat(sorted(crops, key=lambda c: c.time.values), dim="time")
     flashes = pd.concat(frames, ignore_index=True)
-    data_end = pd.Timestamp(max(scan_start(k) for k in glm_keys)) + pd.Timedelta("20s")  # GLM files span 20 s
-    return abi, flashes, data_end
+    glm_starts = sorted(pd.Timestamp(scan_start(k)) for k in glm_keys)
+    data_end = glm_starts[-1] + pd.Timedelta(seconds=GLM_FILE_S)
+    return abi, flashes, data_end, glm_starts
 
 
 def map_layers(abi: xr.Dataset, flashes: pd.DataFrame, data_end: pd.Timestamp) -> dict:
@@ -86,16 +166,21 @@ def map_layers(abi: xr.Dataset, flashes: pd.DataFrame, data_end: pd.Timestamp) -
 def run_once(at: datetime, fs: s3fs.S3FileSystem, lookback: timedelta = LOOKBACK) -> dict:
     fs.invalidate_cache()  # s3fs caches listings; new files arrive every 20 s
     start = at - lookback
-    abi, flashes, data_end = fetch(start, at, fs)
+    abi, flashes, data_end, glm_starts = fetch(start, at, fs)
     tops = cloud_top_series(abi, radius_km=RADIUS_KM)
-    counts = complete_bins(flashes, pd.Timestamp(start), data_end)
+    counts = complete_bins(flashes, pd.Timestamp(start), data_end, glm_starts)
+    health = source_health(list(tops.time), glm_starts, counts, pd.Timestamp(start), pd.Timestamp(at))
     level, alerts = classify(tops, counts, data_end)
+    level = public_level(level, health)
     jumps = lightning_jumps(counts)
     episode_start = episodes(alert_times(tops, counts))[-1] if level == "severe" else None
 
     latest = tops.iloc[-1]
     status = {
+        "schema_version": SCHEMA_VERSION,
+        "algorithm_version": ALGORITHM_VERSION,
         "generated_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "health": health,
         "data_until_utc": data_end.isoformat(),
         "level": level,
         "alerts_utc": [t.isoformat() for t in alerts],
@@ -106,7 +191,8 @@ def run_once(at: datetime, fs: s3fs.S3FileSystem, lookback: timedelta = LOOKBACK
         "radius_km": RADIUS_KM,
         "center": [EVENT_LAT, EVENT_LON],
         "flashes_per_5min": [
-            {"start_utc": t.isoformat(), "count": int(c), "jump": bool(jumps[t])} for t, c in counts.items()
+            {"start_utc": t.isoformat(), "count": None if pd.isna(c) else int(c), "jump": bool(jumps[t])}
+            for t, c in counts.items()
         ],
         "cloud_tops": [
             {"time_utc": row.time.isoformat(), "min_bt_c": round(float(row.min_bt_c), 1)} for row in tops.itertuples()
@@ -117,7 +203,7 @@ def run_once(at: datetime, fs: s3fs.S3FileSystem, lookback: timedelta = LOOKBACK
     (OUT_DIR / "status.json").write_text(json.dumps(status, indent=2))
     (OUT_DIR / "status.html").write_text(HTML_TEMPLATE.replace("__STATUS__", json.dumps(status)))
     print(
-        f"{data_end:%Y-%m-%d %H:%M}Z  {level:<15}  coldest {status['coldest_top_c']:6.1f} C"
+        f"{data_end:%Y-%m-%d %H:%M}Z  {level:<15}  {health['state']:<9}  coldest {status['coldest_top_c']:6.1f} C"
         f"  flashes/5min {counts.tail(6).tolist()}"
     )
     return status
