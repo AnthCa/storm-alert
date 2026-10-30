@@ -1,0 +1,43 @@
+name: Storm map
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"  # GitHub may start scheduled runs several minutes late
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    defaults:
+      run:
+        working-directory: research/requinoa-2026
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - run: uv sync --frozen
+      - run: uv run requinoa-realtime
+      - name: Assemble site
+        run: |
+          mkdir -p site
+          cp data/realtime/status.html site/index.html
+          cp data/realtime/status.json site/status.json
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: research/requinoa-2026/site
+      - id: deploy
+        uses: actions/deploy-pages@v4

@@ -125,15 +125,16 @@ def main(argv: list[str] | None = None) -> None:
     fs = s3fs.S3FileSystem(anon=True)
     if args.at:
         run_once(datetime.fromisoformat(args.at).replace(tzinfo=timezone.utc), fs)
-        return
-    while True:
-        try:
-            run_once(datetime.now(timezone.utc), fs)
-        except Exception as error:  # keep the loop alive through S3 hiccups
-            print(f"cycle failed: {error}")
-        if not args.loop:
-            break
-        time.sleep(CYCLE_S)
+    elif not args.loop:
+        # A single run must fail loudly so a scheduler never publishes a stale page.
+        run_once(datetime.now(timezone.utc), fs)
+    else:
+        while True:
+            try:
+                run_once(datetime.now(timezone.utc), fs)
+            except Exception as error:  # keep the loop alive through S3 hiccups
+                print(f"cycle failed: {error}")
+            time.sleep(CYCLE_S)
     print(f"-> {OUT_DIR / 'status.html'}")
 
 
@@ -142,6 +143,7 @@ HTML_TEMPLATE = """<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="refresh" content="300">
 <title>Tormentas Requínoa</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
@@ -181,6 +183,10 @@ const localTime = new Date(s.data_until_utc).toLocaleString("es-CL",
 document.getElementById("meta").textContent =
   `Datos hasta ${localTime} (hora de Chile) · nube más fría ${s.coldest_top_c} °C ` +
   `a ${s.coldest_km_from_requinoa} km de Requínoa · rayos cada 5 min: ${counts}`;
+const ageMin = Math.round((Date.now() - new Date(s.data_until_utc)) / 60000);
+if (ageMin > 30) {
+  document.getElementById("meta").textContent += ` · ⚠️ datos de hace ${ageMin < 120 ? ageMin + " min" : Math.round(ageMin / 60) + " h"}`;
+}
 
 const map = L.map("map").setView(s.center, 9);
 // OSM's tile servers reject file:// pages (no Referer) and CARTO now needs an
