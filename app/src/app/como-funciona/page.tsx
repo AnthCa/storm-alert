@@ -4,7 +4,7 @@ import { DemoLink } from "@/components/DemoLink";
 import { BoltIcon, CloudIcon, CodeIcon } from "@/components/Icons";
 import { Card, Note, PageShell } from "@/components/PageShell";
 
-export const metadata: Metadata = { title: "Cómo funciona · Storm Alert O'Higgins" };
+export const metadata: Metadata = { title: "Cómo funciona · Miranubes" };
 
 const LEVELS = [
   { name: "Tranquilo", dot: "bg-[#6cb8ff]", tone: "text-quiet", text: "No hay nubes de tormenta ni rayos cerca." },

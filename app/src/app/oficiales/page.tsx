@@ -3,13 +3,13 @@ import { ExternalIcon } from "@/components/Icons";
 import { Note, PageShell } from "@/components/PageShell";
 import { OFFICIAL_SOURCES } from "@/lib/official";
 
-export const metadata: Metadata = { title: "Avisos oficiales · Storm Alert O'Higgins" };
+export const metadata: Metadata = { title: "Avisos oficiales · Miranubes" };
 
 export default function OfficialPage() {
   return (
     <PageShell
       title="Avisos oficiales"
-      intro="Los avisos y alertas oficiales los emiten la Dirección Meteorológica y SENAPRED. Siempre tienen prioridad sobre lo que muestra Storm Alert."
+      intro="Los avisos y alertas oficiales los emiten la Dirección Meteorológica y SENAPRED. Siempre tienen prioridad sobre lo que muestra Miranubes."
     >
       <ul className="flex flex-col gap-3">
         {Object.values(OFFICIAL_SOURCES).map((source) => (
@@ -38,7 +38,7 @@ export default function OfficialPage() {
             <dd className="text-soft">Lo emiten la DMC o SENAPRED. Indica un peligro reconocido y qué hacer.</dd>
           </div>
           <div>
-            <dt className="font-semibold">Observación experimental de Storm Alert</dt>
+            <dt className="font-semibold">Observación experimental de Miranubes</dt>
             <dd className="text-soft">
               Lo que el satélite observa ahora mismo. Es un sistema en prueba, sin validación oficial.
             </dd>

@@ -1,6 +1,6 @@
 import { localTime, type Status } from "./status";
 
-export const APP_URL = "https://storm-alert-one.vercel.app";
+export const APP_URL = "https://miranubes.vercel.app";
 
 /** General status only: the viewer's location never goes into a shared message. */
 export function shareMessage(status: Status): string {
@@ -14,5 +14,5 @@ export function shareMessage(status: Status): string {
         : status.level === "quiet"
           ? `sin actividad convectiva en el área monitoreada, ${area} (${at}).`
           : "observación satelital de tormentas en O'Higgins.";
-  return `Storm Alert O'Higgins (experimental, no oficial): ${body}`;
+  return `Miranubes (experimental, no oficial): ${body}`;
 }

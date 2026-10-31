@@ -12,7 +12,7 @@ export function ShareStatus({ status }: { status: Status }) {
     const text = shareMessage(status);
     try {
       if (navigator.share) {
-        await navigator.share({ title: "Storm Alert O'Higgins", text, url: APP_URL });
+        await navigator.share({ title: "Miranubes", text, url: APP_URL });
         return;
       }
       await navigator.clipboard.writeText(`${text} ${APP_URL}`);

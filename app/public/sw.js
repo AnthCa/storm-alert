@@ -1,4 +1,4 @@
-// Storm Alert service worker: lets the installed app open offline with the last data it saw.
+// Miranubes service worker: lets the installed app open offline with the last data it saw.
 const CACHE = "storm-alert-v3";
 const SHELL = ["/", "/observacion", "/oficiales", "/notificaciones", "/como-funciona", "/privacidad", "/demo/requinoa-2026-10-26.json"];
 

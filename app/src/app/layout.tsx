@@ -19,10 +19,10 @@ const plexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Storm Alert O'Higgins",
+  title: "Miranubes · Tormentas en vivo para O'Higgins",
   description: "Tormentas severas en la región de O'Higgins, en vivo desde el satélite GOES-19.",
-  applicationName: "Storm Alert",
-  appleWebApp: { capable: true, title: "Storm Alert", statusBarStyle: "black-translucent" },
+  applicationName: "Miranubes",
+  appleWebApp: { capable: true, title: "Miranubes", statusBarStyle: "black-translucent" },
 };
 
 export const viewport: Viewport = {

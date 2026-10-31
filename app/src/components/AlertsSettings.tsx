@@ -37,7 +37,7 @@ export function AlertsSettings() {
     >
       <Note title="Todavía no enviamos notificaciones">
         Las estamos preparando. Puedes dejar listas tus preferencias: quedan guardadas solo en este dispositivo. Las
-        notificaciones de Storm Alert serán observaciones experimentales y no reemplazan los avisos oficiales.
+        notificaciones de Miranubes serán observaciones experimentales y no reemplazan los avisos oficiales.
       </Note>
 
       <section className="flex flex-col gap-2">

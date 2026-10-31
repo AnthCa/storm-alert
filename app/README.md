@@ -1,9 +1,9 @@
-# Storm Alert O'Higgins: app
+# Miranubes: app
 
 Mobile-first PWA (Next.js 16, Tailwind 4, MapLibre) that shows severe storms in
 O'Higgins, Chile, in near real time. The UI is in Spanish.
 
-Live: https://storm-alert-one.vercel.app
+Live: https://miranubes.vercel.app
 
 It reads `status.json`, which the Python pipeline in
 [`research/requinoa-2026`](../research/requinoa-2026) publishes to GitHub Pages
@@ -19,7 +19,7 @@ of its own yet.
 | How it works, with the Requínoa tornado case | `/como-funciona` |
 | Privacy policy | `/privacidad` |
 
-Storm Alert shows **experimental observations**, never official alerts. Missing
+Miranubes shows **experimental observations**, never official alerts. Missing
 or late data is shown as such (`degraded`, `stale`, `offline`), never as "no
 storms", and nothing local is computed outside the monitored 50 km circle.
 

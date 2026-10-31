@@ -1,12 +1,12 @@
-# Storm Alert O'Higgins
+# Miranubes (formerly Storm Alert O'Higgins)
 
 Severe-storm early warning for the O'Higgins region of Chile, built on free
 GOES-19 satellite data. Central Chile has no weather radar, and on
 26 October 2026 a tornado hit Requínoa without any warning. This project shows
 that the satellite signal was there about **50 minutes before**.
 
-**App:** https://storm-alert-one.vercel.app
-(replay of the tornado: https://storm-alert-one.vercel.app/?demo=requinoa)
+**App:** https://miranubes.vercel.app
+(replay of the tornado: https://miranubes.vercel.app/?demo=requinoa)
 
 | Part | What it is |
 |---|---|

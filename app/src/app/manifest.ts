@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Storm Alert O'Higgins",
-    short_name: "Storm Alert",
+    name: "Miranubes · Tormentas en vivo para O'Higgins",
+    short_name: "Miranubes",
     description: "Tormentas severas en la región de O'Higgins, en vivo desde el satélite GOES-19.",
     lang: "es-CL",
     start_url: "/",

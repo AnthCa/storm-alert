@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { PageShell } from "@/components/PageShell";
 
-export const metadata: Metadata = { title: "Privacidad · Storm Alert O'Higgins" };
+export const metadata: Metadata = { title: "Privacidad · Miranubes" };
 
 const SECTIONS = [
   {
@@ -10,7 +10,7 @@ const SECTIONS = [
   },
   {
     title: "Dónde se guarda y con qué precisión",
-    body: "En este dispositivo (almacenamiento del navegador), redondeada a unos 1 km. No la enviamos a ningún servidor de Storm Alert. Los cálculos se hacen en tu teléfono o computador.",
+    body: "En este dispositivo (almacenamiento del navegador), redondeada a unos 1 km. No la enviamos a ningún servidor de Miranubes. Los cálculos se hacen en tu teléfono o computador.",
   },
   {
     title: "Cuánto tiempo se conserva",

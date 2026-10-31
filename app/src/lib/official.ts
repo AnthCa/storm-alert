@@ -1,5 +1,5 @@
 /**
- * Official sources. Storm Alert does not copy their notices yet (no stable public API was
+ * Official sources. Miranubes does not copy their notices yet (no stable public API was
  * found; see the launch plan, phase 3), so it links to them instead.
  */
 export const OFFICIAL_SOURCES = {

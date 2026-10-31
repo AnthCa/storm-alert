@@ -13,7 +13,7 @@ export function AppHeader({ status, state, now }: { status: Status | null; state
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <BoltIcon className="text-bolt" />
-          <span className="text-[17px] font-bold tracking-tight">Storm Alert</span>
+          <span className="text-[17px] font-bold tracking-tight">Miranubes</span>
           <span className="rounded-md border border-line px-1.5 py-0.5 text-[11px] font-semibold tracking-wide text-soft">
             EXPERIMENTAL
           </span>
