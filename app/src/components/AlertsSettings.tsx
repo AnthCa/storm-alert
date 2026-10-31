@@ -55,7 +55,9 @@ export function AlertsSettings() {
       await subscribe({ code, lat: place.lat, lon: place.lon, radius });
       setActive({ radius, place: nearestTown(place.lat, place.lon) ?? "tu ubicación" });
     } catch (error) {
-      setMessage(ERRORS[(error as Error).message] ?? "No pudimos activarlas. Inténtalo de nuevo en un momento.");
+      const { name, message } = error as Error;
+      // During the pilot the technical reason is shown too, so testers can report it.
+      setMessage(ERRORS[message] ?? `No pudimos activarlas. Inténtalo de nuevo en un momento. (${name}: ${message})`);
     } finally {
       setBusy(false);
     }
