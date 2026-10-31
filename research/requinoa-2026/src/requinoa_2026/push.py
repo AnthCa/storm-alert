@@ -123,7 +123,8 @@ def _rpc(name: str, payload: dict):
     request = urllib.request.Request(
         url,
         data=json.dumps(payload).encode(),
-        headers={"apikey": key, "Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+        # apikey alone selects the anon role; publishable keys are not JWTs, so no Authorization.
+        headers={"apikey": key, "Content-Type": "application/json"},
         method="POST",
     )
     with urllib.request.urlopen(request, timeout=20) as response:

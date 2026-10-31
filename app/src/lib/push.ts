@@ -45,11 +45,9 @@ export function base64UrlToBytes(value: string): Uint8Array<ArrayBuffer> {
 async function rpc(name: string, body: Record<string, unknown>): Promise<void> {
   const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${name}`, {
     method: "POST",
-    headers: {
-      apikey: SUPABASE_ANON_KEY,
-      Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-      "Content-Type": "application/json",
-    },
+    // The apikey header alone selects the anon role; publishable keys (sb_publishable_…)
+    // are not JWTs and must not go in an Authorization header.
+    headers: { apikey: SUPABASE_ANON_KEY, "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
   if (!response.ok) {
