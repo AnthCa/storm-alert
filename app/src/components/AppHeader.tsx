@@ -1,11 +1,12 @@
-import { ago, localTime, type DataState, type Status } from "@/lib/status";
+import { localTime, type DataState, type Status } from "@/lib/status";
 import { BoltIcon } from "./Icons";
 
 const UPDATE_EVERY_MIN = 10;
 
 /**
- * App name, the "experimental" label and how old each source is.
- * `now` is the shared clock (useNow): 0 until hydrated, when ages are not shown yet.
+ * App name, the "experimental" label and when the next update is due.
+ * The time of each source is shown next to the map (HomeView).
+ * `now` is the shared clock (useNow): 0 until hydrated, when the next update is not shown yet.
  */
 export function AppHeader({ status, state, now }: { status: Status | null; state: DataState; now: number }) {
   return (
@@ -20,7 +21,6 @@ export function AppHeader({ status, state, now }: { status: Status | null; state
         </div>
         {status && now > 0 && state !== "historical" && <NextUpdate status={status} now={now} />}
       </div>
-      {status && now > 0 && state !== "historical" && <SourceAges status={status} now={new Date(now)} />}
     </header>
   );
 }
@@ -33,15 +33,5 @@ function NextUpdate({ status, now }: { status: Status; now: number }) {
     <span className="rounded-full border border-line bg-surface/90 px-2.5 py-1.5 font-mono text-xs text-soft">
       {overdue ? "actualización atrasada" : `próx. ~${localTime(new Date(due).toISOString())}`}
     </span>
-  );
-}
-
-function SourceAges({ status, now }: { status: Status; now: Date }) {
-  const abi = status.health.abi.latest_utc ?? status.latest_scan_utc;
-  const glm = status.health.glm.latest_utc ?? status.data_until_utc;
-  return (
-    <p className="pointer-events-auto self-start rounded-lg bg-bg/80 px-2 py-1 text-xs text-soft">
-      Nubes {ago(abi, now)} · Rayos {ago(glm, now)}
-    </p>
   );
 }

@@ -17,7 +17,7 @@ import {
   type Trend,
 } from "@/lib/geo";
 import { ago, dataState, formatC, localTime, type DataState, type Status } from "@/lib/status";
-import { CheckIcon, ChevronRightIcon, CloudIcon, LocateIcon, PinIcon, WarningIcon } from "./Icons";
+import { ChevronRightIcon, CloudIcon, InfoIcon, LocateIcon, PinIcon, WarningIcon } from "./Icons";
 import { AppHeader } from "./AppHeader";
 import { DemoBanner } from "./DemoBanner";
 import { ShareStatus } from "./ShareStatus";
@@ -82,6 +82,11 @@ export function HomeView() {
         >
           <LocateIcon />
         </button>
+        {status && (
+          <p className="pointer-events-none absolute -top-9 left-4 rounded-lg bg-bg/80 px-2 py-1 text-xs text-soft">
+            Nubes de las {localTime(status.latest_scan_utc)} · rayos hasta las {localTime(status.data_until_utc)}
+          </p>
+        )}
         <button
           type="button"
           onClick={() => setExpanded(!expanded)}
@@ -226,16 +231,30 @@ function StateBanner(props: {
   const regional = nearestStorm(status, ...status.center);
   if (regional && regional.km > status.radius_km) {
     return (
-      <Banner tone="quiet" title="Sin actividad en el área de alerta">
+      <Banner tone="quiet" title="Sin actividad observada en el área de alerta">
         {!hasPlace &&
-          `Hay nubes de tormenta a ${Math.round(regional.km)} km al ${regional.direction} de Requínoa, fuera de los ${status.radius_km} km que vigilamos.`}
+          `Hay nubes de tormenta a ${Math.round(regional.km)} km al ${regional.direction} de Requínoa, fuera de los ${status.radius_km} km que vigilamos. `}
+        <ForecastNote />
       </Banner>
     );
   }
   return (
-    <Banner tone="quiet" title="Sin actividad convectiva detectada">
-      En el área monitoreada: {status.radius_km} km alrededor de Requínoa.
+    <Banner tone="quiet" title="Sin actividad observada ahora">
+      En los {status.radius_km} km alrededor de Requínoa. <ForecastNote />
     </Banner>
+  );
+}
+
+/** "Quiet" describes this moment only; it must not read as an all-clear for the afternoon. */
+function ForecastNote() {
+  return (
+    <>
+      No descarta tormentas más tarde.{" "}
+      <Link href="/oficiales" className="font-semibold text-quiet underline underline-offset-2">
+        Revisa los pronósticos oficiales
+      </Link>
+      .
+    </>
   );
 }
 
@@ -255,7 +274,7 @@ function Banner({
     convective: "border-[#6b4a14] bg-[#2e2210]",
     neutral: "border-line bg-surface/95",
   }[tone];
-  const Icon = icon === "warning" ? WarningIcon : tone === "quiet" ? CheckIcon : CloudIcon;
+  const Icon = icon === "warning" ? WarningIcon : tone === "quiet" ? InfoIcon : CloudIcon;
   const iconColor = tone === "quiet" ? "text-quiet" : tone === "convective" ? "text-convective" : "text-soft";
   return (
     <div className={`pointer-events-auto flex items-center gap-3 rounded-2xl border px-3.5 py-3 ${styles}`} role="status">

@@ -113,8 +113,8 @@ function headline(status: Status, state: ReturnType<typeof dataState>): { title:
     };
   }
   return {
-    title: "Sin actividad convectiva detectada",
-    intro: `En el área monitoreada: ${status.radius_km} km alrededor de Requínoa.`,
+    title: "Sin actividad observada ahora",
+    intro: `En los ${status.radius_km} km alrededor de Requínoa. No descarta tormentas más tarde: revisa los pronósticos oficiales.`,
   };
 }
 
