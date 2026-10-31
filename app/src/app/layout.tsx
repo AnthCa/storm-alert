@@ -3,6 +3,7 @@ import { IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
 import { BottomNav } from "@/components/BottomNav";
 import { ServiceWorker } from "@/components/ServiceWorker";
 import { StatusProvider } from "@/components/StatusProvider";
+import { TitleBadge } from "@/components/TitleBadge";
 import "./globals.css";
 
 const plexSans = IBM_Plex_Sans({
@@ -39,6 +40,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <StatusProvider>
           {children}
           <BottomNav />
+          <TitleBadge />
         </StatusProvider>
         <ServiceWorker />
       </body>
