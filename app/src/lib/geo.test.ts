@@ -13,6 +13,7 @@ import {
   stormEta,
   stormTrend,
 } from "./geo";
+import { replayFrames } from "./replay";
 import { shareMessage } from "./share";
 import { dataState, normalizeStatus, type Status } from "./status";
 
@@ -279,5 +280,26 @@ describe("lightning safety", () => {
 
   it("is null without close flashes", () => {
     expect(lastFlashNear(status({ flash_cells_30min: [[-34.29, -71.2, 1]] }), ...REQUINOA)).toBeNull();
+  });
+});
+
+describe("replay", () => {
+  it("lists earlier scans then the latest, with the flashes of the 10 minutes before each", () => {
+    const frames = replayFrames(
+      status({
+        data_until_utc: "2026-10-26T20:30:00+00:00",
+        latest_scan_utc: "2026-10-26T20:20:20+00:00",
+        cold_history: [{ time_utc: "2026-10-26T20:00:20+00:00", cells: [[-34.3, -70.9, -40]] }],
+        cold_pixels: [[-34.3, -70.85, -45]],
+        recent_flashes: [[-34.3, -70.84]],
+        flash_cells_30min: [
+          [-34.3, -70.95, 25], // 20:05: after the 20:00 scan
+          [-34.3, -70.96, 32], // 19:58: within 10 min before 20:00
+        ],
+      }),
+    );
+    expect(frames.map((f) => f.timeUtc)).toEqual(["2026-10-26T20:00:20+00:00", "2026-10-26T20:20:20+00:00"]);
+    expect(frames[0].flashes).toEqual([[-34.3, -70.96]]);
+    expect(frames[1]).toMatchObject({ cold: [[-34.3, -70.85, -45]], flashes: [[-34.3, -70.84]] });
   });
 });

@@ -104,7 +104,7 @@ export function insideObservedArea(status: Status, lat: number, lon: number): bo
   return !!box && lat >= box.lat_min && lat <= box.lat_max && lon >= box.lon_min && lon <= box.lon_max;
 }
 
-/** History cells are ~5 km wide, so smaller changes are not a real movement. */
+/** Cells are 2-5 km wide and storms grow and shrink, so smaller changes are not a real movement. */
 export const TREND_MIN_KM = 8;
 
 export type Trend =
@@ -210,7 +210,7 @@ export function stormEta(status: Status, lat: number, lon: number): Eta | null {
   const speedKmh = (series[0].km - nowKm) / hours;
   if (speedKmh < ETA_MIN_SPEED_KMH) return null;
 
-  // Even a perfectly steady approach gets a margin: cells are ~5 km and storms change.
+  // Even a perfectly steady approach gets a margin: cells are a few km wide and storms change.
   const centralMin = (nowKm / speedKmh) * 60;
   const fromMin = Math.min((nowKm / Math.max(...stepSpeeds)) * 60, centralMin * ETA_MARGIN_LOW);
   const toMin = Math.max((nowKm / Math.min(...stepSpeeds)) * 60, centralMin * ETA_MARGIN_HIGH);

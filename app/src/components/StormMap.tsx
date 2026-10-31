@@ -4,6 +4,7 @@ import maplibregl, { type GeoJSONSource } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { useEffect, useRef, useSyncExternalStore } from "react";
 import { NEAR_KM, circleRing, nearestStorm } from "@/lib/geo";
+import type { ReplayFrame } from "@/lib/replay";
 import type { Bbox, Status } from "@/lib/status";
 import type { Place } from "./StatusProvider";
 
@@ -59,10 +60,13 @@ function boxOutline(box: Bbox): Feature {
   };
 }
 
-function stormData(status: Status | null) {
+/** Live data, or one frame of the replay while it plays. */
+function stormData(status: Status | null, replay: ReplayFrame | null) {
+  const cold = replay?.cold ?? status?.cold_pixels ?? [];
+  const flashes = replay?.flashes ?? status?.recent_flashes ?? [];
   return {
-    cold: collection((status?.cold_pixels ?? []).map(([lat, lon, t]) => point(lat, lon, { t }))),
-    flashes: collection((status?.recent_flashes ?? []).map(([lat, lon]) => point(lat, lon))),
+    cold: collection(cold.map(([lat, lon, t]) => point(lat, lon, { t }))),
+    flashes: collection(flashes.map(([lat, lon]) => point(lat, lon))),
     area: collection(status ? [ring(status.center[0], status.center[1], status.radius_km)] : []),
     outside: collection(status ? [outsideMask(status.center[0], status.center[1], status.radius_km)] : []),
     observed: collection(status?.observed_bbox ? [boxOutline(status.observed_bbox)] : []),
@@ -118,6 +122,8 @@ interface Props {
   onPick: (lat: number, lon: number) => void;
   /** Id of the text that summarises the map for screen readers. */
   summaryId: string;
+  /** A replay frame to show instead of the live data, or null. */
+  replay: ReplayFrame | null;
 }
 
 let webglSupport: boolean | null = null;
@@ -175,7 +181,7 @@ export default function StormMap(props: Props) {
   return <LiveMap {...props} />;
 }
 
-function LiveMap({ status, place, onPick, summaryId }: Props) {
+function LiveMap({ status, place, onPick, summaryId, replay }: Props) {
   const container = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
   const me = useRef<maplibregl.Marker | null>(null);
@@ -184,8 +190,8 @@ function LiveMap({ status, place, onPick, summaryId }: Props) {
   const userMoved = useRef(false);
   // The status is polled every minute; only a new pipeline run should reframe the map.
   const framedRun = useRef<string | null>(null);
-  const latest = useRef({ status, place, onPick });
-  latest.current = { status, place, onPick };
+  const latest = useRef({ status, place, onPick, replay });
+  latest.current = { status, place, onPick, replay };
 
   useEffect(() => {
     if (!container.current) return;
@@ -207,7 +213,7 @@ function LiveMap({ status, place, onPick, summaryId }: Props) {
     map.current = m;
 
     m.on("load", () => {
-      const data = stormData(latest.current.status);
+      const data = stormData(latest.current.status, latest.current.replay);
       m.addSource("outside", { type: "geojson", data: data.outside });
       m.addSource("area", { type: "geojson", data: data.area });
       m.addSource("observed", { type: "geojson", data: data.observed });
@@ -266,10 +272,26 @@ function LiveMap({ status, place, onPick, summaryId }: Props) {
         id: "cold",
         type: "circle",
         source: "cold",
+        // Colder tops on top, so a storm's core stays visible inside its anvil.
+        layout: { "circle-sort-key": ["-", 0, ["get", "t"]] },
         paint: {
-          "circle-radius": ["interpolate", ["linear"], ["zoom"], 7, 2, 10, 6, 12, 12],
+          // Each pixel drawn at its ground size (~1.5 km radius, doubling per zoom level) and
+          // softened, so neighbouring pixels merge into one cloud shape instead of dots.
+          "circle-radius": ["interpolate", ["exponential", 2], ["zoom"], 6, 1.2, 12, 50],
+          "circle-blur": ["interpolate", ["linear"], ["zoom"], 6, 0.3, 10, 0.7],
           "circle-color": ["step", ["get", "t"], "#C2261B", -50, "#F0644F", -44, "#F2A53A"],
-          "circle-opacity": 0.75,
+          "circle-opacity": 0.7,
+        },
+      });
+      m.addLayer({
+        id: "flashes-glow",
+        type: "circle",
+        source: "flashes",
+        paint: {
+          "circle-radius": ["interpolate", ["linear"], ["zoom"], 7, 5, 11, 12],
+          "circle-color": "#FFE14D",
+          "circle-opacity": 0.25,
+          "circle-blur": 1,
         },
       });
       m.addLayer({
@@ -344,7 +366,7 @@ function LiveMap({ status, place, onPick, summaryId }: Props) {
   function syncStorm() {
     const m = map.current;
     if (!m || !ready.current) return;
-    const data = stormData(latest.current.status);
+    const data = stormData(latest.current.status, latest.current.replay);
     (m.getSource("outside") as GeoJSONSource).setData(data.outside);
     (m.getSource("area") as GeoJSONSource).setData(data.area);
     (m.getSource("observed") as GeoJSONSource).setData(data.observed);
@@ -354,7 +376,7 @@ function LiveMap({ status, place, onPick, summaryId }: Props) {
     if (p) {
       drawPlace(m, p.lat, p.lon);
       const run = latest.current.status?.generated_utc ?? null;
-      if (!userMoved.current && run !== framedRun.current) {
+      if (!userMoved.current && !latest.current.replay && run !== framedRun.current) {
         framedRun.current = run;
         frame(m, p);
       }
@@ -413,7 +435,7 @@ function LiveMap({ status, place, onPick, summaryId }: Props) {
     }
   }
 
-  useEffect(syncStorm, [status]);
+  useEffect(syncStorm, [status, replay]);
   useEffect(syncPlace, [place]);
 
   // Sized, not positioned: maplibre-gl.css sets `position: relative` on the container and,

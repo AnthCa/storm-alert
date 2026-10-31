@@ -23,7 +23,7 @@ export interface CloudTop {
 
 export interface ColdScan {
   time_utc: string;
-  /** [lat, lon, coldest C] per ~5 km cell, parallax-corrected. */
+  /** [lat, lon, coldest C] per ~2 km cell (5 km before 31 Oct 2026), parallax-corrected. */
   cells: [number, number, number][];
 }
 

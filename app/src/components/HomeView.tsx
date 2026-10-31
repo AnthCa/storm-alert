@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNow } from "@/lib/browser-store";
 import {
   AROUND_KM,
@@ -19,8 +19,9 @@ import {
   type StormNearby,
   type Trend,
 } from "@/lib/geo";
+import { replayFrames, type ReplayFrame } from "@/lib/replay";
 import { ago, dataState, formatC, localTime, type DataState, type Status } from "@/lib/status";
-import { BoltFilledIcon, ChevronRightIcon, CloudIcon, InfoIcon, LocateIcon, PinIcon, WarningIcon } from "./Icons";
+import { BoltFilledIcon, ChevronRightIcon, CloudIcon, InfoIcon, LocateIcon, PinIcon, PlayIcon, WarningIcon } from "./Icons";
 import { AppHeader } from "./AppHeader";
 import { DemoBanner } from "./DemoBanner";
 import { ShareStatus } from "./ShareStatus";
@@ -37,10 +38,23 @@ export function HomeView() {
   const [locateMessage, setLocateMessage] = useState<string | null>(null);
   // The map comes first: the sheet stays short unless the viewer asks for details.
   const [expanded, setExpanded] = useState(false);
+  // Replay of the last scans: the frames are taken when it starts, so new data does not cut it.
+  const [replay, setReplay] = useState<{ frames: ReplayFrame[]; index: number } | null>(null);
+
+  useEffect(() => {
+    if (!replay) return;
+    const last = replay.index === replay.frames.length - 1;
+    const timer = setTimeout(
+      () => setReplay(last ? null : { ...replay, index: replay.index + 1 }),
+      last ? REPLAY_HOLD_MS : REPLAY_STEP_MS,
+    );
+    return () => clearTimeout(timer);
+  }, [replay]);
   const now = useNow();
   // Before hydration (now = 0) data counts as current; the clock corrects it a moment later.
   const state = dataState(status, { demo, online, now: now ? new Date(now) : undefined });
   const activity = status && place ? activityAt(status, place.lat, place.lon) : null;
+  const frames = status && state !== "historical" ? replayFrames(status) : [];
 
   async function handleLocate() {
     setLocateMessage("Buscando tu ubicación…");
@@ -62,6 +76,7 @@ export function HomeView() {
           place={place}
           onPick={(lat, lon) => setPlace({ lat, lon, source: "map" })}
           summaryId="storm-summary"
+          replay={replay ? replay.frames[replay.index] : null}
         />
       </div>
 
@@ -88,6 +103,14 @@ export function HomeView() {
         >
           <LocateIcon />
         </button>
+        {frames.length >= 2 && (
+          <ReplayButton
+            frames={frames}
+            playing={replay ? replay.frames[replay.index] : null}
+            onPlay={() => setReplay({ frames, index: 0 })}
+            onStop={() => setReplay(null)}
+          />
+        )}
         <button
           type="button"
           onClick={() => setExpanded(!expanded)}
@@ -154,6 +177,42 @@ export function HomeView() {
         </button>
       </section>
     </main>
+  );
+}
+
+const REPLAY_STEP_MS = 1100;
+const REPLAY_HOLD_MS = 1800;
+
+/** Plays the last scans on the map; while playing it shows the time of the frame on screen. */
+function ReplayButton(props: {
+  frames: ReplayFrame[];
+  playing: ReplayFrame | null;
+  onPlay: () => void;
+  onStop: () => void;
+}) {
+  const { frames, playing, onPlay, onStop } = props;
+  const minutes = Math.round((Date.parse(frames.at(-1)!.timeUtc) - Date.parse(frames[0].timeUtc)) / 60_000);
+  return (
+    <button
+      type="button"
+      onClick={playing ? onStop : onPlay}
+      aria-label={playing ? "Detener repetición" : `Ver los últimos ${minutes} minutos en el mapa`}
+      className="absolute -top-16 left-4 flex h-12 items-center gap-2 rounded-full border border-line bg-surface px-4 text-sm font-semibold"
+    >
+      {playing ? (
+        <>
+          <span className="size-2.5 rounded-[2px] bg-fg" aria-hidden="true" />
+          <span className="font-mono text-base" aria-live="polite">
+            {localTime(playing.timeUtc)}
+          </span>
+        </>
+      ) : (
+        <>
+          <PlayIcon size={16} className="text-bolt" />
+          Últimos {minutes} min
+        </>
+      )}
+    </button>
   );
 }
 
