@@ -138,20 +138,23 @@ export default function HowItWorksPage() {
       <section className="flex flex-col gap-2">
         <h2 className="text-lg font-semibold">Cobertura y versión</h2>
         <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm">
-          <dt className="text-muted">Área monitoreada</dt>
+          <dt className="text-muted">Área de alerta</dt>
           <dd>50 km alrededor de Requínoa</dd>
+          <dt className="text-muted">Mapa</dt>
+          <dd>nubes y rayos de toda la zona de O&apos;Higgins, sin nivel de alerta</dd>
           <dt className="text-muted">Actualización</dt>
           <dd>cada 10 minutos (nubes) y cada 20 segundos (rayos)</dd>
           <dt className="text-muted">Algoritmo</dt>
           <dd className="font-mono">2026.10-r1</dd>
           <dt className="text-muted">Revisado</dt>
-          <dd>30 de octubre de 2026</dd>
+          <dd>31 de octubre de 2026</dd>
         </dl>
       </section>
 
       <Note title="Límites que debes conocer">
         Observa actividad convectiva intensa; no predice tornados. Los datos pueden tardar unos minutos más en llegar,
-        y si faltan, lo decimos. Fuera de los 50 km alrededor de Requínoa no calculamos nada. No reemplaza los avisos
+        y si faltan, lo decimos. Fuera de los 50 km alrededor de Requínoa solo mostramos lo que ve el
+        satélite (distancia y si las nubes se acercan), sin nivel de alerta. No reemplaza los avisos
         oficiales de SENAPRED ni de la Dirección Meteorológica.
       </Note>
 

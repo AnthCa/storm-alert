@@ -1,5 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { activityAt, circleRing, coarsen, direction, distanceKm, nearestTown } from "./geo";
+import {
+  activityAt,
+  circleRing,
+  coarsen,
+  direction,
+  distanceKm,
+  insideObservedArea,
+  nearestStorm,
+  nearestTown,
+  stormTrend,
+} from "./geo";
+import { shareMessage } from "./share";
 import { dataState, normalizeStatus, type Status } from "./status";
 
 const REQUINOA: [number, number] = [-34.29, -70.82];
@@ -28,6 +39,8 @@ function status(overrides: Partial<Status> = {}): Status {
     flashes_per_5min: [],
     cloud_tops: [],
     cold_pixels: [],
+    cold_history: [],
+    observed_bbox: { lat_min: -35.5, lat_max: -33.5, lon_min: -72.5, lon_max: -69.5 },
     recent_flashes: [],
     ...overrides,
   };
@@ -131,5 +144,75 @@ describe("dataState", () => {
     expect(dataState(status(), { demo: false, online: false, now })).toBe("offline");
     expect(dataState(status(), { demo: true, online: true, now })).toBe("historical");
     expect(dataState(null, { demo: false, online: true, now })).toBe("unavailable");
+  });
+});
+
+describe("regional context", () => {
+  // Pichilemu, on the coast, ~110 km west of Requínoa: outside the alert circle.
+  const COAST: [number, number, number] = [-34.39, -72.0, -41];
+
+  it("finds storms outside the alert circle, with direction", () => {
+    const nearest = nearestStorm(status({ cold_pixels: [COAST] }), ...REQUINOA);
+    expect(nearest?.direction).toBe("oeste");
+    expect(nearest!.km).toBeGreaterThan(100);
+  });
+
+  it("has no nearest storm when nothing is observed", () => {
+    expect(nearestStorm(status(), ...REQUINOA)).toBeNull();
+  });
+
+  it("knows the observed box", () => {
+    expect(insideObservedArea(status(), ...RANCAGUA)).toBe(true);
+    expect(insideObservedArea(status(), -33.45, -70.66)).toBe(false); // Santiago
+    expect(insideObservedArea(status({ observed_bbox: null }), ...RANCAGUA)).toBe(false);
+  });
+});
+
+describe("storm trend", () => {
+  const scan = (cells: [number, number, number][]) => ({ time_utc: "2026-10-26T19:50:20+00:00", cells });
+
+  it("reports approaching storms with their earlier distance", () => {
+    const trend = stormTrend(
+      status({ cold_pixels: [[-34.39, -71.3, -45]], cold_history: [scan([[-34.39, -71.6, -42]])] }),
+      ...REQUINOA,
+    );
+    expect(trend?.kind).toBe("approaching");
+    expect(trend && "wasKm" in trend && trend.wasKm).toBeGreaterThan(70);
+    expect(trend?.minutes).toBe(30);
+  });
+
+  it("reports receding storms", () => {
+    const trend = stormTrend(
+      status({ cold_pixels: [[-34.39, -71.6, -45]], cold_history: [scan([[-34.39, -71.3, -42]])] }),
+      ...REQUINOA,
+    );
+    expect(trend?.kind).toBe("receding");
+  });
+
+  it("treats moves within the cell size as steady", () => {
+    const trend = stormTrend(
+      status({ cold_pixels: [[-34.39, -71.3, -45]], cold_history: [scan([[-34.39, -71.33, -42]])] }),
+      ...REQUINOA,
+    );
+    expect(trend?.kind).toBe("steady");
+  });
+
+  it("reports storms that formed since the earlier scan", () => {
+    const trend = stormTrend(status({ cold_pixels: [[-34.39, -71.3, -45]], cold_history: [scan([])] }), ...REQUINOA);
+    expect(trend).toEqual({ kind: "new", minutes: 30 });
+  });
+
+  it("has no trend without history or without storms", () => {
+    expect(stormTrend(status({ cold_pixels: [[-34.39, -71.3, -45]] }), ...REQUINOA)).toBeNull();
+    expect(stormTrend(status({ cold_history: [scan([[-34.39, -71.3, -42]])] }), ...REQUINOA)).toBeNull();
+  });
+});
+
+describe("share message", () => {
+  it("names the level and time but never a location", () => {
+    const text = shareMessage(status({ level: "quiet" }));
+    expect(text).toContain("sin actividad convectiva");
+    expect(text).toContain("no oficial");
+    expect(text).not.toMatch(/-34\.|-70\./);
   });
 });

@@ -4,11 +4,23 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useState } from "react";
 import { useNow } from "@/lib/browser-store";
-import { AROUND_KM, NEAR_KM, activityAt, nearestTown, type Activity } from "@/lib/geo";
+import {
+  AROUND_KM,
+  NEAR_KM,
+  activityAt,
+  insideObservedArea,
+  nearestStorm,
+  nearestTown,
+  stormTrend,
+  type Activity,
+  type StormNearby,
+  type Trend,
+} from "@/lib/geo";
 import { ago, dataState, formatC, localTime, type DataState, type Status } from "@/lib/status";
 import { CheckIcon, ChevronRightIcon, CloudIcon, LocateIcon, PinIcon, WarningIcon } from "./Icons";
 import { AppHeader } from "./AppHeader";
 import { DemoBanner } from "./DemoBanner";
+import { ShareStatus } from "./ShareStatus";
 import { useStatus } from "./StatusProvider";
 
 // MapLibre needs the browser (WebGL), so the map is never server-rendered.
@@ -74,6 +86,7 @@ export function HomeView() {
             activity={activity}
             status={status}
             state={state}
+            place={place}
             town={nearestTown(place.lat, place.lon)}
             onClear={clearPlace}
           />
@@ -98,6 +111,7 @@ export function HomeView() {
         )}
         {status && <Stats status={status} activity={activity} current={state === "healthy" || state === "degraded"} />}
         <Legend />
+        {status && state === "healthy" && <ShareStatus status={status} />}
       </section>
     </main>
   );
@@ -173,6 +187,15 @@ function StateBanner(props: { status: Status | null; state: DataState; error: st
       </Banner>
     );
   }
+  const regional = nearestStorm(status, ...status.center);
+  if (regional && regional.km > status.radius_km) {
+    return (
+      <Banner tone="quiet" title="Sin actividad en el área de alerta">
+        Hay nubes de tormenta a {Math.round(regional.km)} km al {regional.direction} de Requínoa, fuera de los{" "}
+        {status.radius_km} km que vigilamos.
+      </Banner>
+    );
+  }
   return (
     <Banner tone="quiet" title="Sin actividad convectiva detectada">
       En el área monitoreada: {status.radius_km} km alrededor de Requínoa.
@@ -209,23 +232,49 @@ function Banner({
   );
 }
 
+/** "Se acerca: hace 30 min estaba a 62 km." Observed movement of the closest cold tops. */
+function trendText(trend: Trend | null): string | null {
+  if (!trend) return null;
+  if (trend.kind === "new") return `Se formó en los últimos ${trend.minutes} min.`;
+  if (trend.kind === "steady") return `Sin desplazamiento claro en ${trend.minutes} min.`;
+  const verb = trend.kind === "approaching" ? "Se acerca" : "Se aleja";
+  return `${verb}: hace ${trend.minutes} min estaba a ${Math.round(trend.wasKm)} km.`;
+}
+
+function stormLine(storm: StormNearby | null, trend: Trend | null, prefix: string): string {
+  if (!storm) return "El satélite no ve nubes de tormenta en la región.";
+  return [`${prefix} a ${Math.round(storm.km)} km al ${storm.direction}.`, trendText(trend)].filter(Boolean).join(" ");
+}
+
 function PlaceSummary(props: {
   activity: Activity;
   status: Status;
   state: DataState;
+  place: { lat: number; lon: number };
   town: string | null;
   onClear: () => void;
 }) {
-  const { activity, status, state, town, onClear } = props;
+  const { activity, status, state, place, town, onClear } = props;
   const { level, nearest } = activity;
   const current = state === "healthy" || state === "degraded";
+  const storm = nearestStorm(status, place.lat, place.lon);
+  const trend = stormTrend(status, place.lat, place.lon);
+  const observed = insideObservedArea(status, place.lat, place.lon);
   let title: string;
   let advice: string;
+  let context: string | null = null;
   let tone: string;
 
-  if (level === "outside") {
+  if (level === "outside" && observed) {
+    title = storm ? `Nubes de tormenta a ${Math.round(storm.km)} km` : "Sin nubes de tormenta cerca";
+    advice = storm
+      ? [`Al ${storm.direction} de ti.`, trendText(trend)].filter(Boolean).join(" ")
+      : "El satélite no ve nubes de tormenta en la región.";
+    context = `Estás fuera del área de alerta (${status.radius_km} km alrededor de Requínoa): aquí solo mostramos lo que ve el satélite. Revisa los avisos oficiales.`;
+    tone = storm && storm.km <= AROUND_KM ? "text-convective" : "text-soft";
+  } else if (level === "outside") {
     title = "Fuera del área monitoreada";
-    advice = `Por ahora solo observamos ${status.radius_km} km alrededor de Requínoa. Revisa los avisos oficiales para tu zona.`;
+    advice = `Por ahora solo observamos la zona de O'Higgins y alertamos ${status.radius_km} km alrededor de Requínoa. Revisa los avisos oficiales para tu zona.`;
     tone = "text-soft";
   } else if (level === "over") {
     title = "Actividad sobre tu zona";
@@ -237,10 +286,12 @@ function PlaceSummary(props: {
       status.level === "severe"
         ? "Se está intensificando. Si estás al aire libre, busca refugio."
         : "Mantente atento por si se acerca.";
+    context = trendText(trend);
     tone = status.level === "severe" ? "text-severe" : "text-convective";
   } else if (state === "healthy") {
     title = `Sin actividad detectada a menos de ${AROUND_KM} km`;
     advice = "Revisamos el satélite cada 10 minutos.";
+    context = storm ? stormLine(storm, trend, "Las nubes de tormenta más cercanas están") : null;
     tone = "text-quiet";
   } else {
     title = "No podemos confirmar el estado";
@@ -261,7 +312,8 @@ function PlaceSummary(props: {
       </div>
       <h2 className={`text-2xl font-bold tracking-tight ${tone}`}>{title}</h2>
       <p className="text-sm text-soft">{advice}</p>
-      {!current && level !== "outside" && (
+      {context && current && <p className="text-[13px] text-soft">{context}</p>}
+      {!current && (level !== "outside" || observed) && (
         <p className="text-[13px] text-muted">Según datos de las {localTime(status.data_until_utc)}.</p>
       )}
     </div>

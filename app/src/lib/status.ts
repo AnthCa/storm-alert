@@ -21,6 +21,19 @@ export interface CloudTop {
   min_bt_c: number;
 }
 
+export interface ColdScan {
+  time_utc: string;
+  /** [lat, lon, coldest C] per ~5 km cell, parallax-corrected. */
+  cells: [number, number, number][];
+}
+
+export interface Bbox {
+  lat_min: number;
+  lat_max: number;
+  lon_min: number;
+  lon_max: number;
+}
+
 export interface Status {
   schema_version: number;
   algorithm_version: string;
@@ -40,6 +53,10 @@ export interface Status {
   cloud_tops: CloudTop[];
   /** [lat, lon, brightness temperature in C], parallax-corrected, latest scan only. */
   cold_pixels: [number, number, number][];
+  /** Thinned cold tops of up to three earlier scans, oldest first (schema 3+). */
+  cold_history: ColdScan[];
+  /** Area where clouds and flashes are mapped (schema 3+); wider than the alert circle. */
+  observed_bbox: Bbox | null;
   /** [lat, lon] of flashes in the last 10 minutes. */
   recent_flashes: [number, number][];
 }
@@ -81,6 +98,8 @@ export function normalizeStatus(raw: Partial<Status> & Pick<Status, "level" | "d
     flashes_per_5min: (raw.flashes_per_5min ?? []).map((b) => ({ ...b, jump: b.jump ?? false })),
     cloud_tops: raw.cloud_tops ?? [],
     cold_pixels: raw.cold_pixels ?? [],
+    cold_history: raw.cold_history ?? [],
+    observed_bbox: raw.observed_bbox ?? null,
     recent_flashes: raw.recent_flashes ?? [],
   } as Status;
 }

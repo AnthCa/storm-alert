@@ -82,6 +82,51 @@ export function activityAt(status: Status, lat: number, lon: number): Activity {
   return { level, flashesNear, nearest: found, coldestAroundC, insideValidatedArea };
 }
 
+/** Closest observed storm anywhere on the map: a cold cloud top or a recent flash. */
+export interface StormNearby {
+  km: number;
+  direction: string;
+}
+
+export function nearestStorm(status: Status, lat: number, lon: number): StormNearby | null {
+  let best: StormNearby | null = null;
+  for (const [pLat, pLon] of [...status.cold_pixels, ...status.recent_flashes]) {
+    const km = distanceKm(lat, lon, pLat, pLon);
+    if (!best || km < best.km) best = { km, direction: direction(lat, lon, pLat, pLon) };
+  }
+  return best;
+}
+
+export function insideObservedArea(status: Status, lat: number, lon: number): boolean {
+  const box = status.observed_bbox;
+  return !!box && lat >= box.lat_min && lat <= box.lat_max && lon >= box.lon_min && lon <= box.lon_max;
+}
+
+/** History cells are ~5 km wide, so smaller changes are not a real movement. */
+export const TREND_MIN_KM = 8;
+
+export type Trend =
+  | { kind: "approaching" | "receding" | "steady"; wasKm: number; minutes: number }
+  | { kind: "new"; minutes: number };
+
+/**
+ * Whether the closest cold cloud tops got nearer to a point, comparing the latest scan with
+ * the oldest earlier scan shipped in status.json. null when there is nothing to compare.
+ */
+export function stormTrend(status: Status, lat: number, lon: number): Trend | null {
+  const oldest = status.cold_history[0];
+  if (!oldest || status.cold_pixels.length === 0) return null;
+  const minutes = Math.round((Date.parse(status.latest_scan_utc) - Date.parse(oldest.time_utc)) / 60_000);
+  if (minutes <= 0) return null;
+  if (oldest.cells.length === 0) return { kind: "new", minutes };
+  const closest = (points: [number, number, number][]) =>
+    Math.min(...points.map(([pLat, pLon]) => distanceKm(lat, lon, pLat, pLon)));
+  const nowKm = closest(status.cold_pixels);
+  const wasKm = closest(oldest.cells);
+  const kind = nowKm <= wasKm - TREND_MIN_KM ? "approaching" : nowKm >= wasKm + TREND_MIN_KM ? "receding" : "steady";
+  return { kind, wasKm, minutes };
+}
+
 /** Two decimals is about 1 km: enough to measure distance to a storm, too coarse to find a home. */
 export function coarsen(value: number): number {
   return Math.round(value * 100) / 100;
