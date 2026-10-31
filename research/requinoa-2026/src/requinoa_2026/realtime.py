@@ -45,10 +45,11 @@ MAX_GLM_DELAY = pd.Timedelta("10min")
 MAX_ABI_DELAY = pd.Timedelta("25min")
 # The jump test reads the last 30 minutes, so gaps there make "quiet" unprovable.
 RECENT_BINS = 6
-# Earlier scans shipped so the app can tell whether storms approach a place.
-# Thinned to cells of this size (~5 km) to keep status.json small.
+# Earlier scans shipped so the app can tell whether storms approach a place and
+# replay the last half hour. Cells of ~2 km, about one ABI pixel over Chile, so the
+# replay keeps the latest scan's detail while duplicates still collapse.
 HISTORY_SCANS = 3
-HISTORY_CELL_DEG = 0.05
+HISTORY_CELL_DEG = 0.02
 # Lightning safety advice ("wait 30 minutes after the last flash") needs when the last
 # flashes fell. Thinned to ~2 km cells, keeping each cell's most recent flash.
 FLASH_SAFETY_WINDOW = pd.Timedelta("30min")

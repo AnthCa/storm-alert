@@ -89,9 +89,12 @@ def test_late_glm_degrades():
 
 
 def abi_scans(temps_c: list[list[float]]) -> xr.Dataset:
-    """One-row ABI crops (three pixels ~1 km apart), one scan per list, 10 minutes apart."""
+    """One-row ABI crops, one scan per list, 10 minutes apart.
+
+    The first two pixels are ~0.2 km apart (same 2 km cell); the third is ~2 km away.
+    """
     lat = np.full((1, 3), -34.3)
-    lon = np.array([[-70.80, -70.79, -70.78]])
+    lon = np.array([[-70.800, -70.802, -70.78]])
     times = pd.date_range("2026-10-26T19:00", periods=len(temps_c), freq="10min").values
     bt = np.array(temps_c).reshape(len(temps_c), 1, 3) + 273.15
     return xr.Dataset(

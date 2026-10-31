@@ -107,8 +107,8 @@ Leaflet map, `status.html`, with these features:
   a 10 km cloud top appears about 8 km too far south; after the correction,
   the storm core sits 2 km from Requínoa.
 - Lightning from the last 10 minutes.
-- Thinned cold cloud tops of the three previous scans (`cold_history`, ~5 km
-  cells), so the app can tell whether storms approach a place. Display only:
+- Thinned cold cloud tops of the three previous scans (`cold_history`, ~2 km
+  cells), so the app can tell whether storms approach a place and replay them. Display only:
   the alert rule does not read it.
 - `flash_cells_30min`: the latest flash of the last 30 minutes per ~2 km cell,
   with its age in minutes, for the "wait 30 minutes after the last flash"
