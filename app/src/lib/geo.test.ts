@@ -6,6 +6,7 @@ import {
   direction,
   distanceKm,
   insideObservedArea,
+  lastFlashNear,
   nearestStorm,
   nearestTown,
   etaText,
@@ -44,6 +45,7 @@ function status(overrides: Partial<Status> = {}): Status {
     cold_history: [],
     observed_bbox: { lat_min: -35.5, lat_max: -33.5, lon_min: -72.5, lon_max: -69.5 },
     recent_flashes: [],
+    flash_cells_30min: [],
     ...overrides,
   };
 }
@@ -254,5 +256,28 @@ describe("arrival estimate", () => {
     const scan = "2026-10-26T19:50:20+00:00";
     expect(etaText({ speedKmh: 61, fromMin: 38, toMin: 52 }, scan)).toContain("entre las 17:30 y las 17:40");
     expect(etaText({ speedKmh: 30, fromMin: 120, toMin: 400 }, scan)).toContain("después de las 18:50");
+  });
+});
+
+describe("lightning safety", () => {
+  it("reports the latest close flash and when the 30-minute wait ends", () => {
+    const flash = lastFlashNear(
+      status({
+        flash_cells_30min: [
+          [-34.29, -70.88, 12], // ~5.5 km west, 12 min before 20:30 UTC
+          [-34.29, -70.84, 20], // closer but older
+          [-34.29, -71.2, 1], // newest but ~35 km away
+        ],
+      }),
+      ...REQUINOA,
+    );
+    expect(flash?.direction).toBe("oeste");
+    expect(flash!.km).toBeGreaterThan(5);
+    expect(flash?.atUtc).toBe("2026-10-26T20:18:00.000Z");
+    expect(flash?.safeAfterUtc).toBe("2026-10-26T20:48:00.000Z");
+  });
+
+  it("is null without close flashes", () => {
+    expect(lastFlashNear(status({ flash_cells_30min: [[-34.29, -71.2, 1]] }), ...REQUINOA)).toBeNull();
   });
 });

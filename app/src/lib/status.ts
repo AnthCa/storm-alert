@@ -59,6 +59,8 @@ export interface Status {
   observed_bbox: Bbox | null;
   /** [lat, lon] of flashes in the last 10 minutes. */
   recent_flashes: [number, number][];
+  /** [lat, lon, minutes before data_until_utc] of the latest flash per ~2 km cell, last 30 min (schema 4+). */
+  flash_cells_30min: [number, number, number][];
 }
 
 export const LIVE_STATUS_URL =
@@ -101,6 +103,7 @@ export function normalizeStatus(raw: Partial<Status> & Pick<Status, "level" | "d
     cold_history: raw.cold_history ?? [],
     observed_bbox: raw.observed_bbox ?? null,
     recent_flashes: raw.recent_flashes ?? [],
+    flash_cells_30min: raw.flash_cells_30min ?? [],
   } as Status;
 }
 

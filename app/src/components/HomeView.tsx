@@ -10,6 +10,7 @@ import {
   activityAt,
   etaText,
   insideObservedArea,
+  lastFlashNear,
   nearestStorm,
   nearestTown,
   stormEta,
@@ -19,7 +20,7 @@ import {
   type Trend,
 } from "@/lib/geo";
 import { ago, dataState, formatC, localTime, type DataState, type Status } from "@/lib/status";
-import { ChevronRightIcon, CloudIcon, InfoIcon, LocateIcon, PinIcon, WarningIcon } from "./Icons";
+import { BoltFilledIcon, ChevronRightIcon, CloudIcon, InfoIcon, LocateIcon, PinIcon, WarningIcon } from "./Icons";
 import { AppHeader } from "./AppHeader";
 import { DemoBanner } from "./DemoBanner";
 import { ShareStatus } from "./ShareStatus";
@@ -132,12 +133,12 @@ export function HomeView() {
             {locateMessage}
           </p>
         )}
+        <Legend />
         {expanded && (
           <div id="storm-details" className="flex flex-col gap-3">
             {status && (
               <Stats status={status} activity={activity} current={state === "healthy" || state === "degraded"} />
             )}
-            <Legend />
             {status && state === "healthy" && <ShareStatus status={status} />}
           </div>
         )}
@@ -324,6 +325,7 @@ function PlaceSummary(props: {
   // A steady approach gets an arrival range; otherwise just the observed movement.
   const movement = eta ? etaText(eta, status.latest_scan_utc) : trendText(stormTrend(status, place.lat, place.lon));
   const observed = insideObservedArea(status, place.lat, place.lon);
+  const flash = observed ? lastFlashNear(status, place.lat, place.lon) : null;
   let title: string;
   let advice: string;
   let context: string | null = null;
@@ -352,6 +354,12 @@ function PlaceSummary(props: {
         : "Mantente atento por si se acerca.";
     context = movement;
     tone = status.level === "severe" ? "text-severe" : "text-convective";
+  } else if (state === "healthy" && flash) {
+    // No flash in the last 10 minutes, but one within the safety distance in the last 30.
+    title = "Rayos recientes cerca de ti";
+    advice = "La tormenta puede seguir activa aunque no veas rayos ahora.";
+    context = storm ? stormLine(storm, movement, "Nubes de tormenta más cercanas") : null;
+    tone = "text-convective";
   } else if (state === "healthy") {
     title = `Sin actividad a menos de ${AROUND_KM} km`;
     advice = "Revisamos el satélite cada 10 minutos.";
@@ -375,6 +383,15 @@ function PlaceSummary(props: {
         </button>
       </div>
       <h2 className={`text-xl font-bold tracking-tight ${tone}`}>{title}</h2>
+      {flash && current && (
+        <p className="flex gap-1.5 text-sm font-semibold text-bolt">
+          <BoltFilledIcon size={14} className="mt-[3px] shrink-0" />
+          <span>
+            Último rayo a {Math.round(flash.km)} km al {flash.direction}, a las {localTime(flash.atUtc)}. Si no caen
+            más, quédate bajo techo hasta las {localTime(flash.safeAfterUtc)}.
+          </span>
+        </p>
+      )}
       <p className="text-sm text-soft">{advice}</p>
       {context && current && (detailed || level !== "outside") && <p className="text-[13px] text-soft">{context}</p>}
       {!current && (level !== "outside" || observed) && (
@@ -428,22 +445,25 @@ function Stat({ label, value, note, highlight }: { label: string; value: string;
   );
 }
 
+/** Always visible: the colours are the map's main message, so they need words next to them. */
 function Legend() {
   const items = [
+    { label: "−38° tormenta", className: "bg-convective" },
+    { label: "−44° fuerte", className: "bg-[#f0644f]" },
+    { label: "−50° muy fuerte", className: "bg-[#c2261b]" },
     { label: "Rayo", className: "border-[1.5px] border-bolt" },
-    { label: "Nube de tormenta", className: "bg-convective" },
-    { label: "Fuerte", className: "bg-[#f0644f]" },
-    { label: "Núcleo", className: "bg-[#c2261b]" },
-    { label: "Área monitoreada", className: "border-[1.5px] border-dashed border-[#7a8491]" },
   ];
   return (
-    <ul className="flex flex-wrap gap-x-3 gap-y-1.5 text-xs text-soft" aria-label="Leyenda del mapa">
-      {items.map((item) => (
-        <li key={item.label} className="flex items-center gap-1.5">
-          <span className={`size-2.5 rounded-full ${item.className}`} aria-hidden="true" />
-          {item.label}
-        </li>
-      ))}
-    </ul>
+    <div className="flex flex-col gap-1">
+      <p className="text-xs text-muted">Nubes: más fría = más alta = tormenta más intensa</p>
+      <ul className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-soft" aria-label="Leyenda del mapa">
+        {items.map((item) => (
+          <li key={item.label} className="flex items-center gap-1.5">
+            <span className={`size-2.5 rounded-full ${item.className}`} aria-hidden="true" />
+            {item.label}
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }

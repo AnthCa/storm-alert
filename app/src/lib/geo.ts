@@ -129,6 +129,36 @@ export function stormTrend(status: Status, lat: number, lon: number): Trend | nu
   return { kind, wasKm, minutes };
 }
 
+/** Thunder carries about this far: flashes closer than this put people at risk. */
+export const LIGHTNING_SAFETY_KM = 15;
+/** Standard advice: stay indoors until this long has passed without a close flash. */
+export const LIGHTNING_WAIT_MIN = 30;
+
+export interface LastFlash {
+  km: number;
+  direction: string;
+  /** When it fell and when the wait ends, as ISO UTC times. */
+  atUtc: string;
+  safeAfterUtc: string;
+}
+
+/** The most recent flash within LIGHTNING_SAFETY_KM in the last 30 minutes, if any. */
+export function lastFlashNear(status: Status, lat: number, lon: number): LastFlash | null {
+  let best: { km: number; age: number; pLat: number; pLon: number } | null = null;
+  for (const [pLat, pLon, age] of status.flash_cells_30min) {
+    const km = distanceKm(lat, lon, pLat, pLon);
+    if (km <= LIGHTNING_SAFETY_KM && (!best || age < best.age)) best = { km, age, pLat, pLon };
+  }
+  if (!best) return null;
+  const at = Date.parse(status.data_until_utc) - best.age * 60_000;
+  return {
+    km: best.km,
+    direction: direction(lat, lon, best.pLat, best.pLon),
+    atUtc: new Date(at).toISOString(),
+    safeAfterUtc: new Date(at + LIGHTNING_WAIT_MIN * 60_000).toISOString(),
+  };
+}
+
 /** Arrival estimates only for storms between these distances; farther, the error is too large. */
 export const ETA_MIN_KM = NEAR_KM;
 export const ETA_MAX_KM = 150;
