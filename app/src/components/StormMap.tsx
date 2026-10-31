@@ -4,6 +4,7 @@ import maplibregl, { type GeoJSONSource } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { useEffect, useRef, useSyncExternalStore } from "react";
 import { NEAR_KM, circleRing, nearestStorm } from "@/lib/geo";
+import { DEFAULT_BBOX, paintClouds } from "@/lib/cloud-image";
 import type { ReplayFrame } from "@/lib/replay";
 import type { Bbox, Status } from "@/lib/status";
 import type { Place } from "./StatusProvider";
@@ -60,37 +61,12 @@ function boxOutline(box: Bbox): Feature {
   };
 }
 
-/** ABI pixels are ~2 km apart on a grid slightly rotated from lat/lon; a bit more avoids gaps. */
-const PIXEL_KM = 2.3;
-
-/** The ground footprint of one satellite pixel, so pixels tile into a continuous image. */
-function pixelSquare(lat: number, lon: number, t: number): Feature {
-  const dLat = PIXEL_KM / 2 / KM_PER_DEG_LAT;
-  const dLon = dLat / Math.cos((lat * Math.PI) / 180);
-  return {
-    type: "Feature",
-    geometry: {
-      type: "Polygon",
-      coordinates: [
-        [
-          [lon - dLon, lat - dLat],
-          [lon + dLon, lat - dLat],
-          [lon + dLon, lat + dLat],
-          [lon - dLon, lat + dLat],
-          [lon - dLon, lat - dLat],
-        ],
-      ],
-    },
-    properties: { t },
-  };
-}
-
 /** Live data, or one frame of the replay while it plays. */
 function stormData(status: Status | null, replay: ReplayFrame | null) {
   const cold = replay?.cold ?? status?.cold_pixels ?? [];
   const flashes = replay?.flashes ?? status?.recent_flashes ?? [];
   return {
-    cold: collection(cold.flatMap(([lat, lon, t]) => [point(lat, lon, { t }), pixelSquare(lat, lon, t)])),
+    cold,
     flashes: collection(flashes.map(([lat, lon]) => point(lat, lon))),
     area: collection(status ? [ring(status.center[0], status.center[1], status.radius_km)] : []),
     outside: collection(status ? [outsideMask(status.center[0], status.center[1], status.radius_km)] : []),
@@ -193,59 +169,48 @@ function framePadding(m: maplibregl.Map) {
 
 const COLD_LAYERS = ["cold-a", "cold-b"] as const;
 type ColdLayer = (typeof COLD_LAYERS)[number];
-const COLD_OPACITY = 0.88; // high enough that the slight tile overlaps do not show as a grid
-const HALO_OPACITY = 0.22;
 /** Long enough to read as one image dissolving into the next, like a radar loop. */
 const FADE_MS = 900;
 
+/** Corners of the box, clockwise from the north-west, as image sources want them. */
+function boxCorners(box: Bbox): [[number, number], [number, number], [number, number], [number, number]] {
+  return [
+    [box.lon_min, box.lat_max],
+    [box.lon_max, box.lat_max],
+    [box.lon_max, box.lat_min],
+    [box.lon_min, box.lat_min],
+  ];
+}
+
 /**
- * A soft halo from the pixel centres, then the pixels as tiles: together they read as a
- * continuous satellite image with soft edges. Drawn under the base map's labels.
+ * The cloud image as a canvas raster, smoothed by linear resampling and drawn under the
+ * base map's labels so town names stay readable over a storm.
  */
-function addColdLayers(m: maplibregl.Map, id: ColdLayer, visible: 0 | 1) {
+function addColdLayer(m: maplibregl.Map, id: ColdLayer, canvas: HTMLCanvasElement, box: Bbox, visible: 0 | 1) {
   const fade = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : FADE_MS;
-  const color: maplibregl.ExpressionSpecification = ["step", ["get", "t"], "#C2261B", -50, "#F0644F", -44, "#F2A53A"];
-  // Colder tops on top, so a storm's core stays visible inside its anvil.
-  const sortKey: maplibregl.ExpressionSpecification = ["-", 0, ["get", "t"]];
+  m.addSource(id, { type: "canvas", canvas, coordinates: boxCorners(box), animate: false });
   const labels = m.getStyle().layers.find((layer) => layer.type === "symbol")?.id;
   m.addLayer(
     {
-      id: `${id}-halo`,
-      type: "circle",
-      source: id,
-      filter: ["==", ["geometry-type"], "Point"],
-      layout: { "circle-sort-key": sortKey },
-      paint: {
-        "circle-radius": ["interpolate", ["exponential", 2], ["zoom"], 6, 3, 12, 110],
-        "circle-blur": 1,
-        "circle-color": color,
-        "circle-opacity": HALO_OPACITY * visible,
-        "circle-opacity-transition": { duration: fade, delay: 0 },
-      },
-    },
-    labels,
-  );
-  m.addLayer(
-    {
       id,
-      type: "fill",
+      type: "raster",
       source: id,
-      filter: ["==", ["geometry-type"], "Polygon"],
-      layout: { "fill-sort-key": sortKey },
       paint: {
-        "fill-color": color,
-        "fill-opacity": COLD_OPACITY * visible,
-        "fill-opacity-transition": { duration: fade, delay: 0 },
-        "fill-antialias": false,
+        "raster-opacity": visible,
+        "raster-opacity-transition": { duration: fade, delay: 0 },
+        "raster-resampling": "linear",
+        "raster-fade-duration": 0,
       },
     },
     labels,
   );
 }
 
-function setColdOpacity(m: maplibregl.Map, id: ColdLayer, visible: 0 | 1) {
-  m.setPaintProperty(id, "fill-opacity", COLD_OPACITY * visible);
-  m.setPaintProperty(`${id}-halo`, "circle-opacity", HALO_OPACITY * visible);
+function paintCanvas(canvas: HTMLCanvasElement, pixels: [number, number, number][], box: Bbox) {
+  const image = paintClouds(pixels, box);
+  canvas.width = image.width;
+  canvas.height = image.height;
+  canvas.getContext("2d")!.putImageData(new ImageData(image.data, image.width, image.height), 0, 0);
 }
 
 /** Storms farther than this from the viewer are not worth zooming the map out for. */
@@ -270,6 +235,8 @@ function LiveMap({ status, place, onPick, summaryId, replay }: Props) {
   const ready = useRef(false);
   // Two copies of the cloud layers: new data fades in on one while the other fades out.
   const coldFront = useRef<ColdLayer>("cold-a");
+  const coldCanvas = useRef<Record<ColdLayer, HTMLCanvasElement> | null>(null);
+  const coldBox = useRef<Bbox>(DEFAULT_BBOX);
   // Once the viewer pans or zooms by hand, new data no longer moves the map.
   const userMoved = useRef(false);
   // The status is polled every minute; only a new pipeline run should reframe the map.
@@ -301,7 +268,6 @@ function LiveMap({ status, place, onPick, summaryId, replay }: Props) {
       m.addSource("outside", { type: "geojson", data: data.outside });
       m.addSource("area", { type: "geojson", data: data.area });
       m.addSource("observed", { type: "geojson", data: data.observed });
-      for (const id of COLD_LAYERS) m.addSource(id, { type: "geojson", data: data.cold });
       m.addSource("flashes", { type: "geojson", data: data.flashes });
       m.addSource("me-ring", { type: "geojson", data: collection([]) });
       m.addSource("me-rings", { type: "geojson", data: collection([]) });
@@ -352,7 +318,13 @@ function LiveMap({ status, place, onPick, summaryId, replay }: Props) {
         },
         paint: { "text-color": "#8A949F", "text-halo-color": "#0e1116", "text-halo-width": 1.5 },
       });
-      for (const id of COLD_LAYERS) addColdLayers(m, id, id === coldFront.current ? 1 : 0);
+      const box = latest.current.status?.observed_bbox ?? DEFAULT_BBOX;
+      coldBox.current = box;
+      coldCanvas.current = { "cold-a": document.createElement("canvas"), "cold-b": document.createElement("canvas") };
+      for (const id of COLD_LAYERS) {
+        paintCanvas(coldCanvas.current[id], id === coldFront.current ? data.cold : [], box);
+        addColdLayer(m, id, coldCanvas.current[id], box, id === coldFront.current ? 1 : 0);
+      }
       m.addLayer({
         id: "flashes-glow",
         type: "circle",
@@ -454,12 +426,18 @@ function LiveMap({ status, place, onPick, summaryId, replay }: Props) {
     }
   }
 
-  function showCold(m: maplibregl.Map, data: GeoJSON.FeatureCollection) {
+  /** Paints the new clouds on the hidden layer, then fades it in over the visible one. */
+  function showCold(m: maplibregl.Map, pixels: [number, number, number][]) {
+    if (!coldCanvas.current) return;
     const front = coldFront.current;
     const back = front === "cold-a" ? "cold-b" : "cold-a";
-    (m.getSource(back) as GeoJSONSource).setData(data);
-    setColdOpacity(m, back, 1);
-    setColdOpacity(m, front, 0);
+    paintCanvas(coldCanvas.current[back], pixels, coldBox.current);
+    // A static canvas source re-reads its pixels only while playing: play for one frame.
+    const source = m.getSource(back) as maplibregl.CanvasSource;
+    source.play();
+    m.once("render", () => source.pause());
+    m.setPaintProperty(back, "raster-opacity", 1);
+    m.setPaintProperty(front, "raster-opacity", 0);
     coldFront.current = back;
   }
 

@@ -13,6 +13,7 @@ import {
   stormEta,
   stormTrend,
 } from "./geo";
+import { DEFAULT_BBOX, paintClouds } from "./cloud-image";
 import { replayFrames } from "./replay";
 import { shareMessage } from "./share";
 import { dataState, normalizeStatus, type Status } from "./status";
@@ -319,5 +320,36 @@ describe("replay", () => {
     expect(frames.map((f) => f.timeUtc)).toEqual(["2026-10-26T20:00:20+00:00", "2026-10-26T20:20:20+00:00"]);
     expect(frames[0].flashes).toEqual([[-34.3, -70.96]]);
     expect(frames[1]).toMatchObject({ cold: [[-34.3, -70.85, -45]], flashes: [[-34.3, -70.84]] });
+  });
+});
+
+describe("cloud image", () => {
+  const box = { lat_min: -34.4, lat_max: -34.2, lon_min: -70.9, lon_max: -70.7 };
+  const at = (img: ReturnType<typeof paintClouds>, lat: number, lon: number) => {
+    const x = Math.floor((lon - box.lon_min) / 0.01);
+    const y = Math.floor((box.lat_max - lat) / 0.01);
+    return Array.from(img.data.slice((y * img.width + x) * 4, (y * img.width + x) * 4 + 4));
+  };
+
+  it("fills each pixel's footprint and leaves the rest transparent", () => {
+    const img = paintClouds([[-34.3, -70.8, -40]], box);
+    expect([img.width, img.height]).toEqual([20, 20]);
+    expect(at(img, -34.3, -70.8)).toEqual([242, 165, 58, 225]);
+    expect(at(img, -34.25, -70.75)[3]).toBe(0);
+  });
+
+  it("keeps the colder pixel where two overlap", () => {
+    const img = paintClouds(
+      [
+        [-34.3, -70.8, -52],
+        [-34.301, -70.801, -39],
+      ],
+      box,
+    );
+    expect(at(img, -34.3, -70.8).slice(0, 3)).toEqual([194, 38, 27]);
+  });
+
+  it("covers the pipeline's mapped area by default", () => {
+    expect(paintClouds([], DEFAULT_BBOX)).toMatchObject({ width: 300, height: 200 });
   });
 });
