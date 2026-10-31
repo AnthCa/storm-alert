@@ -1,6 +1,8 @@
+import numpy as np
 import pandas as pd
+import xarray as xr
 
-from requinoa_2026.realtime import classify, complete_bins, public_level, source_health
+from requinoa_2026.realtime import classify, cold_cells, cold_history, complete_bins, public_level, source_health
 from test_false_alarms import jumping_counts, tops, ts
 
 
@@ -76,3 +78,36 @@ def test_late_glm_degrades():
     counts = complete_bins(EMPTY, ts("19:00"), ts("19:20"), files)
     health = source_health([ts("19:00:20"), ts("19:10:20"), ts("19:20:20")], files, counts, ts("19:00"), ts("19:35"))
     assert "glm_late" in health["problems"]
+
+
+def abi_scans(temps_c: list[list[float]]) -> xr.Dataset:
+    """One-row ABI crops (three pixels ~1 km apart), one scan per list, 10 minutes apart."""
+    lat = np.full((1, 3), -34.3)
+    lon = np.array([[-70.80, -70.79, -70.78]])
+    times = pd.date_range("2026-10-26T19:00", periods=len(temps_c), freq="10min").values
+    bt = np.array(temps_c).reshape(len(temps_c), 1, 3) + 273.15
+    return xr.Dataset(
+        {"brightness_temp_k": (("time", "y", "x"), bt)},
+        coords={"time": times, "lat": (("y", "x"), lat), "lon": (("y", "x"), lon)},
+    )
+
+
+def test_cold_cells_keep_the_coldest_pixel_per_cell():
+    cells = cold_cells(abi_scans([[-40.0, -45.0, -20.0]]).isel(time=0))
+    assert len(cells) == 1
+    assert cells[0][2] == -45.0
+
+
+def test_scan_without_cold_tops_has_no_cells():
+    assert cold_cells(abi_scans([[-20.0, -10.0, 0.0]]).isel(time=0)) == []
+
+
+def test_history_skips_the_latest_scan_and_keeps_the_last_three():
+    history = cold_history(abi_scans([[-40.0] * 3, [-20.0] * 3, [-41.0] * 3, [-42.0] * 3, [-43.0] * 3]))
+    assert [h["time_utc"] for h in history] == [
+        "2026-10-26T19:10:00+00:00",
+        "2026-10-26T19:20:00+00:00",
+        "2026-10-26T19:30:00+00:00",
+    ]
+    assert history[0]["cells"] == []
+    assert history[-1]["cells"][0][2] == -42.0

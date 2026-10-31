@@ -107,6 +107,11 @@ Leaflet map, `status.html`, with these features:
   a 10 km cloud top appears about 8 km too far south; after the correction,
   the storm core sits 2 km from Requínoa.
 - Lightning from the last 10 minutes.
+- Thinned cold cloud tops of the three previous scans (`cold_history`, ~5 km
+  cells), so the app can tell whether storms approach a place. Display only:
+  the alert rule does not read it.
+- `observed_bbox`: the box where clouds and flashes are mapped. It is wider
+  than the 50 km alert circle; outside the circle there is no alert level.
 - A "your location" panel. Viewers can use GPS, tap the map or drag a point,
   and see the distance and direction to the nearest storm. The location is
   computed in the browser and never sent anywhere.

@@ -19,7 +19,7 @@ import pandas as pd
 import s3fs
 import xarray as xr
 
-from requinoa_2026.config import DATA_DIR, EVENT_LAT, EVENT_LON
+from requinoa_2026.config import BBOX, DATA_DIR, EVENT_LAT, EVENT_LON
 from requinoa_2026.false_alarms import COLD_TOP_C, RADIUS_KM, alert_times, episodes
 from requinoa_2026.goes import hourly_keys, read_abi_crop, read_glm_flashes, scan_start, with_retries
 from requinoa_2026.satellite_analysis import GLM_BIN, cloud_top_series, flash_counts, lightning_jumps, parallax_correct
@@ -32,7 +32,7 @@ LOOKBACK = timedelta(minutes=45)
 ALERT_MEMORY = pd.Timedelta("30min")
 CYCLE_S = 600
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 # Bump whenever the alert rule or its thresholds change (see false_alarms.py).
 ALGORITHM_VERSION = "2026.10-r1"
 
@@ -45,6 +45,10 @@ MAX_GLM_DELAY = pd.Timedelta("10min")
 MAX_ABI_DELAY = pd.Timedelta("25min")
 # The jump test reads the last 30 minutes, so gaps there make "quiet" unprovable.
 RECENT_BINS = 6
+# Earlier scans shipped so the app can tell whether storms approach a place.
+# Thinned to cells of this size (~5 km) to keep status.json small.
+HISTORY_SCANS = 3
+HISTORY_CELL_DEG = 0.05
 
 
 def classify(tops: pd.DataFrame, counts: pd.Series, at: pd.Timestamp) -> tuple[str, list[pd.Timestamp]]:
@@ -145,6 +149,32 @@ def fetch(start: datetime, end: datetime, fs: s3fs.S3FileSystem):
     return abi, flashes, data_end, glm_starts
 
 
+def cold_cells(scan: xr.Dataset, cell_deg: float = HISTORY_CELL_DEG) -> list[list[float]]:
+    """Parallax-corrected cold cloud tops of one scan, as the coldest pixel per grid cell."""
+    bt_c = scan.brightness_temp_k.values - 273.15
+    cold = bt_c <= COLD_TOP_C
+    if not cold.any():
+        return []
+    lats, lons = parallax_correct(scan.lat.values[cold], scan.lon.values[cold])
+    cells = (
+        pd.DataFrame(
+            {"lat": (lats / cell_deg).round() * cell_deg, "lon": (lons / cell_deg).round() * cell_deg, "t": bt_c[cold]}
+        )
+        .groupby(["lat", "lon"], as_index=False)["t"]
+        .min()
+    )
+    return [[round(float(r.lat), 3), round(float(r.lon), 3), round(float(r.t), 1)] for r in cells.itertuples()]
+
+
+def cold_history(abi: xr.Dataset, scans: int = HISTORY_SCANS) -> list[dict]:
+    """Thinned cold tops of the scans before the latest one, oldest first (display only)."""
+    earlier = abi.isel(time=slice(max(0, abi.sizes["time"] - 1 - scans), -1))
+    return [
+        {"time_utc": pd.Timestamp(t).tz_localize("UTC").isoformat(), "cells": cold_cells(earlier.sel(time=t))}
+        for t in earlier.time.values
+    ]
+
+
 def map_layers(abi: xr.Dataset, flashes: pd.DataFrame, data_end: pd.Timestamp) -> dict:
     """Cold cloud-top pixels of the latest scan and flashes of the last 10 minutes.
 
@@ -160,7 +190,11 @@ def map_layers(abi: xr.Dataset, flashes: pd.DataFrame, data_end: pd.Timestamp) -
         [round(float(lat), 3), round(float(lon), 3), round(float(t), 1)] for lat, lon, t in zip(lats, lons, bt_c[cold])
     ]
     recent = flashes[flashes.time >= data_end - pd.Timedelta("10min")]
-    return {"cold_pixels": cold_pixels, "recent_flashes": recent[["lat", "lon"]].round(3).values.tolist()}
+    return {
+        "cold_pixels": cold_pixels,
+        "cold_history": cold_history(abi),
+        "recent_flashes": recent[["lat", "lon"]].round(3).values.tolist(),
+    }
 
 
 def run_once(at: datetime, fs: s3fs.S3FileSystem, lookback: timedelta = LOOKBACK) -> dict:
@@ -190,6 +224,8 @@ def run_once(at: datetime, fs: s3fs.S3FileSystem, lookback: timedelta = LOOKBACK
         "coldest_km_from_requinoa": round(float(latest.coldest_km_from_requinoa), 1),
         "radius_km": RADIUS_KM,
         "center": [EVENT_LAT, EVENT_LON],
+        # Cloud tops and flashes are mapped over this whole box; the alert only covers radius_km.
+        "observed_bbox": BBOX,
         "flashes_per_5min": [
             {"start_utc": t.isoformat(), "count": None if pd.isna(c) else int(c), "jump": bool(jumps[t])}
             for t, c in counts.items()
