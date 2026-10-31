@@ -11,9 +11,9 @@ import type { Place } from "./StatusProvider";
 const STYLE_URL = "https://tiles.openfreemap.org/styles/dark";
 const REQUINOA: [number, number] = [-70.82, -34.29];
 
-type Feature = GeoJSON.Feature<GeoJSON.Geometry, Record<string, number>>;
+type Feature = GeoJSON.Feature<GeoJSON.Geometry, Record<string, number | string>>;
 const collection = (features: Feature[]): GeoJSON.FeatureCollection => ({ type: "FeatureCollection", features });
-const point = (lat: number, lon: number, props: Record<string, number> = {}): Feature => ({
+const point = (lat: number, lon: number, props: Record<string, number | string> = {}): Feature => ({
   type: "Feature",
   geometry: { type: "Point", coordinates: [lon, lat] },
   properties: props,
@@ -46,6 +46,43 @@ function stormData(status: Status | null) {
     flashes: collection((status?.recent_flashes ?? []).map(([lat, lon]) => point(lat, lon))),
     area: collection(status ? [ring(status.center[0], status.center[1], status.radius_km)] : []),
     outside: collection(status ? [outsideMask(status.center[0], status.center[1], status.radius_km)] : []),
+  };
+}
+
+/** Rings around the viewer, to read distances on the map at a glance. */
+const DISTANCE_RINGS_KM = [25, 50, 100];
+const KM_PER_DEG_LAT = 111.2;
+const LABEL_FONT = ["Noto Sans Regular"];
+
+/** Distance rings and a line to the closest storm, with their labels. */
+function placeData(status: Status | null, lat: number, lon: number) {
+  const rings = DISTANCE_RINGS_KM.map((km) => ({
+    type: "Feature" as const,
+    geometry: { type: "LineString" as const, coordinates: circleRing(lat, lon, km) },
+    properties: { km },
+  }));
+  const labels = DISTANCE_RINGS_KM.map((km) => point(lat + km / KM_PER_DEG_LAT, lon, { label: `${km} km` }));
+  const storm = status && nearestStorm(status, lat, lon);
+  const line: Feature[] = storm
+    ? [
+        {
+          type: "Feature",
+          geometry: {
+            type: "LineString",
+            coordinates: [
+              [lon, lat],
+              [storm.lon, storm.lat],
+            ],
+          },
+          properties: {},
+        },
+        point((lat + storm.lat) / 2, (lon + storm.lon) / 2, { label: `${Math.round(storm.km)} km` }),
+      ]
+    : [];
+  return {
+    near: collection([ring(lat, lon, NEAR_KM)]),
+    rings: collection([...rings, ...labels]),
+    stormLine: collection(line),
   };
 }
 
@@ -100,6 +137,10 @@ function LiveMap({ status, place, onPick, summaryId }: Props) {
   const map = useRef<maplibregl.Map | null>(null);
   const me = useRef<maplibregl.Marker | null>(null);
   const ready = useRef(false);
+  // Once the viewer pans or zooms by hand, new data no longer moves the map.
+  const userMoved = useRef(false);
+  // The status is polled every minute; only a new pipeline run should reframe the map.
+  const framedRun = useRef<string | null>(null);
   const latest = useRef({ status, place, onPick });
   latest.current = { status, place, onPick };
 
@@ -129,6 +170,8 @@ function LiveMap({ status, place, onPick, summaryId }: Props) {
       m.addSource("cold", { type: "geojson", data: data.cold });
       m.addSource("flashes", { type: "geojson", data: data.flashes });
       m.addSource("me-ring", { type: "geojson", data: collection([]) });
+      m.addSource("me-rings", { type: "geojson", data: collection([]) });
+      m.addSource("storm-line", { type: "geojson", data: collection([]) });
 
       m.addLayer({
         id: "outside",
@@ -163,6 +206,36 @@ function LiveMap({ status, place, onPick, summaryId }: Props) {
           "circle-stroke-width": 1.5,
         },
       });
+      m.addLayer({
+        id: "me-rings",
+        type: "line",
+        source: "me-rings",
+        filter: ["==", ["geometry-type"], "LineString"],
+        paint: { "line-color": "#6CB8FF", "line-width": 1, "line-opacity": 0.35 },
+      });
+      m.addLayer({
+        id: "me-ring-labels",
+        type: "symbol",
+        source: "me-rings",
+        filter: ["==", ["geometry-type"], "Point"],
+        layout: { "text-field": ["get", "label"], "text-font": LABEL_FONT, "text-size": 11 },
+        paint: { "text-color": "#9CCBFF", "text-halo-color": "#0e1116", "text-halo-width": 1.5 },
+      });
+      m.addLayer({
+        id: "storm-line",
+        type: "line",
+        source: "storm-line",
+        filter: ["==", ["geometry-type"], "LineString"],
+        paint: { "line-color": "#F2A53A", "line-width": 1.5, "line-dasharray": [2, 2] },
+      });
+      m.addLayer({
+        id: "storm-line-label",
+        type: "symbol",
+        source: "storm-line",
+        filter: ["==", ["geometry-type"], "Point"],
+        layout: { "text-field": ["get", "label"], "text-font": LABEL_FONT, "text-size": 13 },
+        paint: { "text-color": "#FFD08A", "text-halo-color": "#0e1116", "text-halo-width": 2 },
+      });
       m.addLayer({ id: "me-ring-fill", type: "fill", source: "me-ring", paint: { "fill-color": "#6CB8FF", "fill-opacity": 0.08 } });
       m.addLayer({ id: "me-ring-line", type: "line", source: "me-ring", paint: { "line-color": "#6CB8FF", "line-width": 1.5 } });
 
@@ -172,7 +245,13 @@ function LiveMap({ status, place, onPick, summaryId }: Props) {
       syncPlace();
     });
 
-    m.on("click", (e) => latest.current.onPick(e.lngLat.lat, e.lngLat.lng));
+    m.on("click", (e) => {
+      userMoved.current = true; // a hand-picked place stays where the viewer is looking
+      latest.current.onPick(e.lngLat.lat, e.lngLat.lng);
+    });
+    m.on("movestart", (e) => {
+      if ((e as { originalEvent?: Event }).originalEvent) userMoved.current = true;
+    });
 
     return () => {
       ready.current = false;
@@ -180,7 +259,9 @@ function LiveMap({ status, place, onPick, summaryId }: Props) {
       map.current = null;
       me.current = null;
     };
-    // The map is created once; data changes flow through the effects below.
+    // The map is created once; data changes flow through the effects below, and the
+    // sync functions read the latest props through refs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function syncStorm() {
@@ -191,6 +272,40 @@ function LiveMap({ status, place, onPick, summaryId }: Props) {
     (m.getSource("area") as GeoJSONSource).setData(data.area);
     (m.getSource("cold") as GeoJSONSource).setData(data.cold);
     (m.getSource("flashes") as GeoJSONSource).setData(data.flashes);
+    const p = latest.current.place;
+    if (p) {
+      drawPlace(m, p.lat, p.lon);
+      const run = latest.current.status?.generated_utc ?? null;
+      if (!userMoved.current && run !== framedRun.current) {
+        framedRun.current = run;
+        frame(m, p);
+      }
+    }
+  }
+
+  function drawPlace(m: maplibregl.Map, lat: number, lon: number) {
+    const data = placeData(latest.current.status, lat, lon);
+    (m.getSource("me-ring") as GeoJSONSource).setData(data.near);
+    (m.getSource("me-rings") as GeoJSONSource).setData(data.rings);
+    (m.getSource("storm-line") as GeoJSONSource).setData(data.stormLine);
+  }
+
+  /** Frames the viewer and the closest storm together, clear of the banner and the sheet. */
+  function frame(m: maplibregl.Map, p: Place) {
+    const duration = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 800;
+    const status = latest.current.status;
+    const storm = status && nearestStorm(status, p.lat, p.lon);
+    if (storm && storm.km <= STORM_FRAME_KM) {
+      m.fitBounds(
+        [
+          [Math.min(p.lon, storm.lon), Math.min(p.lat, storm.lat)],
+          [Math.max(p.lon, storm.lon), Math.max(p.lat, storm.lat)],
+        ],
+        { padding: { top: 200, bottom: 200, left: 40, right: 40 }, maxZoom: 10, duration },
+      );
+    } else {
+      m.easeTo({ center: [p.lon, p.lat], zoom: Math.max(m.getZoom(), 9), duration });
+    }
   }
 
   function syncPlace() {
@@ -203,31 +318,20 @@ function LiveMap({ status, place, onPick, summaryId }: Props) {
         .addTo(m);
       me.current.on("drag", () => {
         const { lat, lng } = me.current!.getLngLat();
-        (m.getSource("me-ring") as GeoJSONSource).setData(collection([ring(lat, lng, NEAR_KM)]));
+        drawPlace(m, lat, lng);
       });
       me.current.on("dragend", () => {
+        userMoved.current = true;
         const { lat, lng } = me.current!.getLngLat();
         latest.current.onPick(lat, lng);
       });
     }
     me.current.setLngLat([p.lon, p.lat]);
-    (m.getSource("me-ring") as GeoJSONSource).setData(collection([ring(p.lat, p.lon, NEAR_KM)]));
+    drawPlace(m, p.lat, p.lon);
     if (p.source === "gps") {
-      const duration = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 800;
-      const status = latest.current.status;
-      const storm = status && nearestStorm(status, p.lat, p.lon);
-      if (storm && storm.km <= STORM_FRAME_KM) {
-        // Frame the viewer and the closest storm together, clear of the banner and the sheet.
-        m.fitBounds(
-          [
-            [Math.min(p.lon, storm.lon), Math.min(p.lat, storm.lat)],
-            [Math.max(p.lon, storm.lon), Math.max(p.lat, storm.lat)],
-          ],
-          { padding: { top: 200, bottom: 200, left: 40, right: 40 }, maxZoom: 10, duration },
-        );
-      } else {
-        m.easeTo({ center: [p.lon, p.lat], zoom: Math.max(m.getZoom(), 9), duration });
-      }
+      // Asking for the location again is asking to see it: follow the data from here on.
+      userMoved.current = false;
+      frame(m, p);
     }
   }
 
