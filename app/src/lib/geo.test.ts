@@ -13,7 +13,7 @@ import {
   stormEta,
   stormTrend,
 } from "./geo";
-import { DEFAULT_BBOX, paintClouds } from "./cloud-image";
+import { DEFAULT_BBOX, GRID_DEG, paintClouds } from "./cloud-image";
 import { replayFrames } from "./replay";
 import { shareMessage } from "./share";
 import { dataState, normalizeStatus, type Status } from "./status";
@@ -326,16 +326,29 @@ describe("replay", () => {
 describe("cloud image", () => {
   const box = { lat_min: -34.4, lat_max: -34.2, lon_min: -70.9, lon_max: -70.7 };
   const at = (img: ReturnType<typeof paintClouds>, lat: number, lon: number) => {
-    const x = Math.floor((lon - box.lon_min) / 0.01);
-    const y = Math.floor((box.lat_max - lat) / 0.01);
+    const x = Math.floor((lon - box.lon_min) / GRID_DEG);
+    const y = Math.floor((box.lat_max - lat) / GRID_DEG);
     return Array.from(img.data.slice((y * img.width + x) * 4, (y * img.width + x) * 4 + 4));
   };
 
-  it("fills each pixel's footprint and leaves the rest transparent", () => {
+  it("fills each pixel's footprint with soft edges and leaves the rest transparent", () => {
     const img = paintClouds([[-34.3, -70.8, -40]], box);
-    expect([img.width, img.height]).toEqual([20, 20]);
-    expect(at(img, -34.3, -70.8)).toEqual([242, 165, 58, 225]);
-    expect(at(img, -34.25, -70.75)[3]).toBe(0);
+    expect([img.width, img.height]).toEqual([40, 40]);
+    const centre = at(img, -34.3, -70.8);
+    expect(centre.slice(0, 3)).toEqual([242, 165, 58]); // premultiplied blur keeps the colour
+    expect(centre[3]).toBeGreaterThan(80); // a lone pixel stays faint, as it should
+    const edge = at(img, -34.3, -70.775);
+    expect(edge[3]).toBeGreaterThan(0);
+    expect(edge[3]).toBeLessThan(centre[3]);
+    expect(at(img, -34.22, -70.72)[3]).toBe(0);
+  });
+
+  it("leaves no gap between rows of pixels 2.1 km apart", () => {
+    const rows = [-34.28, -34.299, -34.318].flatMap((lat) =>
+      [-70.82, -70.8, -70.78].map((lon) => [lat, lon, -40] as [number, number, number]),
+    );
+    const img = paintClouds(rows, box);
+    for (const lat of [-34.29, -34.308]) expect(at(img, lat, -70.8)[3]).toBeGreaterThan(150);
   });
 
   it("keeps the colder pixel where two overlap", () => {
@@ -346,10 +359,12 @@ describe("cloud image", () => {
       ],
       box,
     );
-    expect(at(img, -34.3, -70.8).slice(0, 3)).toEqual([194, 38, 27]);
+    const [r, g] = at(img, -34.3, -70.8);
+    expect(r).toBeLessThan(215); // the cold core dominates the blend
+    expect(g).toBeLessThan(90);
   });
 
   it("covers the pipeline's mapped area by default", () => {
-    expect(paintClouds([], DEFAULT_BBOX)).toMatchObject({ width: 300, height: 200 });
+    expect(paintClouds([], DEFAULT_BBOX)).toMatchObject({ width: 600, height: 400 });
   });
 });
