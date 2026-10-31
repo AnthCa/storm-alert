@@ -182,11 +182,13 @@ export function AlertsSettings() {
               autoComplete="off"
               placeholder="NUBES-XXXXXX"
               required
-              className="min-h-12 rounded-xl border border-line bg-surface px-3.5 font-mono text-[15px] tracking-wider"
+              // 16px or more: iOS Safari zooms into smaller inputs and leaves the page shifted.
+              className="min-h-12 w-full min-w-0 rounded-xl border border-line bg-surface px-3.5 font-mono text-base tracking-wider"
             />
           </div>
 
-          <fieldset className="flex flex-col gap-2.5">
+          {/* min-w-0: a fieldset otherwise never shrinks below its content and widens the page. */}
+          <fieldset className="flex min-w-0 flex-col gap-2.5">
             <legend className="mb-2.5 text-[17px] font-semibold">
               Avisarme si hay tormentas a menos de
             </legend>
