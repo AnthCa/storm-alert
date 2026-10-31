@@ -194,6 +194,20 @@ describe("storm trend", () => {
     expect(trend?.kind).toBe("receding");
   });
 
+  it("calls an impossible jump a change of clouds, not movement", () => {
+    // 6 km to 59 km in 30 min would be over 100 km/h: the close clouds died out.
+    const gone = stormTrend(
+      status({ cold_pixels: [[-34.82, -70.82, -38.4]], cold_history: [scan([[-34.34, -70.82, -38.5]])] }),
+      ...REQUINOA,
+    );
+    expect(gone?.kind).toBe("dissipated");
+    const formed = stormTrend(
+      status({ cold_pixels: [[-34.34, -70.82, -38.4]], cold_history: [scan([[-34.82, -70.82, -38.5]])] }),
+      ...REQUINOA,
+    );
+    expect(formed?.kind).toBe("formed_closer");
+  });
+
   it("treats moves within the cell size as steady", () => {
     const trend = stormTrend(
       status({ cold_pixels: [[-34.39, -71.3, -45]], cold_history: [scan([[-34.39, -71.33, -42]])] }),
@@ -240,6 +254,10 @@ describe("arrival estimate", () => {
     expect(etaText(eta!, "2026-10-26T19:50:20+00:00")).toBe(
       "Se acercan a ~60 km/h. Si mantienen el ritmo, podrían llegar entre las 18:10 y las 19:00 (estimación, puede cambiar).",
     );
+  });
+
+  it("gives no estimate when a step is faster than a storm can travel", () => {
+    expect(stormEta(at([140, 130, 120], 70), ...REQUINOA)).toBeNull();
   });
 
   it("gives no estimate when the distance jumps back and forth", () => {

@@ -74,7 +74,7 @@ function stormData(status: Status | null, replay: ReplayFrame | null) {
 }
 
 /** Rings around the viewer, to read distances on the map at a glance. */
-const DISTANCE_RINGS_KM = [25, 50, 100];
+const DISTANCE_RINGS_KM = [25, 50];
 const KM_PER_DEG_LAT = 111.2;
 const LABEL_FONT = ["Noto Sans Regular"];
 
@@ -166,6 +166,54 @@ function framePadding(m: maplibregl.Map) {
   };
 }
 
+const COLD_LAYERS = ["cold-a", "cold-b"] as const;
+type ColdLayer = (typeof COLD_LAYERS)[number];
+const COLD_OPACITY = 0.7;
+const HALO_OPACITY = 0.22;
+/** Long enough to read as one image dissolving into the next, like a radar loop. */
+const FADE_MS = 900;
+
+/** A soft halo under the cloud pixels, then the pixels: together they read as a cloud. */
+function addColdLayers(m: maplibregl.Map, id: ColdLayer, visible: 0 | 1) {
+  const fade = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : FADE_MS;
+  const color: maplibregl.ExpressionSpecification = ["step", ["get", "t"], "#C2261B", -50, "#F0644F", -44, "#F2A53A"];
+  // Colder tops on top, so a storm's core stays visible inside its anvil.
+  const layout = { "circle-sort-key": ["-", 0, ["get", "t"]] as maplibregl.ExpressionSpecification };
+  m.addLayer({
+    id: `${id}-halo`,
+    type: "circle",
+    source: id,
+    layout,
+    paint: {
+      "circle-radius": ["interpolate", ["exponential", 2], ["zoom"], 6, 4, 12, 140],
+      "circle-blur": 1,
+      "circle-color": color,
+      "circle-opacity": HALO_OPACITY * visible,
+      "circle-opacity-transition": { duration: fade, delay: 0 },
+    },
+  });
+  m.addLayer({
+    id,
+    type: "circle",
+    source: id,
+    layout,
+    paint: {
+      // Each pixel drawn at its ground size (~1.5 km radius, doubling per zoom level) and
+      // softened, so neighbouring pixels merge into one cloud shape instead of dots.
+      "circle-radius": ["interpolate", ["exponential", 2], ["zoom"], 6, 1.6, 12, 60],
+      "circle-blur": ["interpolate", ["linear"], ["zoom"], 6, 0.4, 10, 0.7],
+      "circle-color": color,
+      "circle-opacity": COLD_OPACITY * visible,
+      "circle-opacity-transition": { duration: fade, delay: 0 },
+    },
+  });
+}
+
+function setColdOpacity(m: maplibregl.Map, id: ColdLayer, visible: 0 | 1) {
+  m.setPaintProperty(id, "circle-opacity", COLD_OPACITY * visible);
+  m.setPaintProperty(`${id}-halo`, "circle-opacity", HALO_OPACITY * visible);
+}
+
 /** Storms farther than this from the viewer are not worth zooming the map out for. */
 const STORM_FRAME_KM = 150;
 
@@ -186,6 +234,8 @@ function LiveMap({ status, place, onPick, summaryId, replay }: Props) {
   const map = useRef<maplibregl.Map | null>(null);
   const me = useRef<maplibregl.Marker | null>(null);
   const ready = useRef(false);
+  // Two copies of the cloud layers: new data fades in on one while the other fades out.
+  const coldFront = useRef<ColdLayer>("cold-a");
   // Once the viewer pans or zooms by hand, new data no longer moves the map.
   const userMoved = useRef(false);
   // The status is polled every minute; only a new pipeline run should reframe the map.
@@ -217,7 +267,7 @@ function LiveMap({ status, place, onPick, summaryId, replay }: Props) {
       m.addSource("outside", { type: "geojson", data: data.outside });
       m.addSource("area", { type: "geojson", data: data.area });
       m.addSource("observed", { type: "geojson", data: data.observed });
-      m.addSource("cold", { type: "geojson", data: data.cold });
+      for (const id of COLD_LAYERS) m.addSource(id, { type: "geojson", data: data.cold });
       m.addSource("flashes", { type: "geojson", data: data.flashes });
       m.addSource("me-ring", { type: "geojson", data: collection([]) });
       m.addSource("me-rings", { type: "geojson", data: collection([]) });
@@ -268,21 +318,7 @@ function LiveMap({ status, place, onPick, summaryId, replay }: Props) {
         },
         paint: { "text-color": "#8A949F", "text-halo-color": "#0e1116", "text-halo-width": 1.5 },
       });
-      m.addLayer({
-        id: "cold",
-        type: "circle",
-        source: "cold",
-        // Colder tops on top, so a storm's core stays visible inside its anvil.
-        layout: { "circle-sort-key": ["-", 0, ["get", "t"]] },
-        paint: {
-          // Each pixel drawn at its ground size (~1.5 km radius, doubling per zoom level) and
-          // softened, so neighbouring pixels merge into one cloud shape instead of dots.
-          "circle-radius": ["interpolate", ["exponential", 2], ["zoom"], 6, 1.2, 12, 50],
-          "circle-blur": ["interpolate", ["linear"], ["zoom"], 6, 0.3, 10, 0.7],
-          "circle-color": ["step", ["get", "t"], "#C2261B", -50, "#F0644F", -44, "#F2A53A"],
-          "circle-opacity": 0.7,
-        },
-      });
+      for (const id of COLD_LAYERS) addColdLayers(m, id, id === coldFront.current ? 1 : 0);
       m.addLayer({
         id: "flashes-glow",
         type: "circle",
@@ -335,8 +371,8 @@ function LiveMap({ status, place, onPick, summaryId, replay }: Props) {
         layout: { "text-field": ["get", "label"], "text-font": LABEL_FONT, "text-size": 13 },
         paint: { "text-color": "#FFD08A", "text-halo-color": "#0e1116", "text-halo-width": 2 },
       });
-      m.addLayer({ id: "me-ring-fill", type: "fill", source: "me-ring", paint: { "fill-color": "#6CB8FF", "fill-opacity": 0.08 } });
-      m.addLayer({ id: "me-ring-line", type: "line", source: "me-ring", paint: { "line-color": "#6CB8FF", "line-width": 1.5 } });
+      m.addLayer({ id: "me-ring-fill", type: "fill", source: "me-ring", paint: { "fill-color": "#6CB8FF", "fill-opacity": 0.05 } });
+      m.addLayer({ id: "me-ring-line", type: "line", source: "me-ring", paint: { "line-color": "#6CB8FF", "line-width": 1, "line-opacity": 0.6 } });
 
       new maplibregl.Marker({ element: markerElement("requinoa-marker") }).setLngLat(REQUINOA).addTo(m);
       ready.current = true;
@@ -370,7 +406,7 @@ function LiveMap({ status, place, onPick, summaryId, replay }: Props) {
     (m.getSource("outside") as GeoJSONSource).setData(data.outside);
     (m.getSource("area") as GeoJSONSource).setData(data.area);
     (m.getSource("observed") as GeoJSONSource).setData(data.observed);
-    (m.getSource("cold") as GeoJSONSource).setData(data.cold);
+    showCold(m, data.cold);
     (m.getSource("flashes") as GeoJSONSource).setData(data.flashes);
     const p = latest.current.place;
     if (p) {
@@ -381,6 +417,15 @@ function LiveMap({ status, place, onPick, summaryId, replay }: Props) {
         frame(m, p);
       }
     }
+  }
+
+  function showCold(m: maplibregl.Map, data: GeoJSON.FeatureCollection) {
+    const front = coldFront.current;
+    const back = front === "cold-a" ? "cold-b" : "cold-a";
+    (m.getSource(back) as GeoJSONSource).setData(data);
+    setColdOpacity(m, back, 1);
+    setColdOpacity(m, front, 0);
+    coldFront.current = back;
   }
 
   function drawPlace(m: maplibregl.Map, lat: number, lon: number) {

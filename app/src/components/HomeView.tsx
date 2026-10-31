@@ -180,8 +180,8 @@ export function HomeView() {
   );
 }
 
-const REPLAY_STEP_MS = 1100;
-const REPLAY_HOLD_MS = 1800;
+const REPLAY_STEP_MS = 1800;
+const REPLAY_HOLD_MS = 2500;
 
 /** Plays the last scans on the map; while playing it shows the time of the frame on screen. */
 function ReplayButton(props: {
@@ -383,6 +383,9 @@ function trendText(trend: Trend | null): string | null {
   if (!trend) return null;
   if (trend.kind === "new") return `Se formaron en los últimos ${trend.minutes} min.`;
   if (trend.kind === "steady") return `Sin desplazamiento claro en ${trend.minutes} min.`;
+  if (trend.kind === "dissipated")
+    return `Las que estaban a ${Math.round(trend.wasKm)} km hace ${trend.minutes} min se deshicieron.`;
+  if (trend.kind === "formed_closer") return `Se formaron más cerca en los últimos ${trend.minutes} min.`;
   const verb = trend.kind === "approaching" ? "Se acercan" : "Se alejan";
   return `${verb}: hace ${trend.minutes} min estaban a ${Math.round(trend.wasKm)} km.`;
 }

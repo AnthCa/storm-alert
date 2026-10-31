@@ -107,8 +107,15 @@ export function insideObservedArea(status: Status, lat: number, lon: number): bo
 /** Cells are 2-5 km wide and storms grow and shrink, so smaller changes are not a real movement. */
 export const TREND_MIN_KM = 8;
 
+/**
+ * Storms rarely travel faster than this. A bigger jump in the closest distance means the
+ * nearest clouds died out or new ones formed elsewhere, not that a storm moved.
+ */
+export const MAX_STORM_SPEED_KMH = 90;
+
 export type Trend =
   | { kind: "approaching" | "receding" | "steady"; wasKm: number; minutes: number }
+  | { kind: "formed_closer" | "dissipated"; wasKm: number; minutes: number }
   | { kind: "new"; minutes: number };
 
 /**
@@ -125,6 +132,9 @@ export function stormTrend(status: Status, lat: number, lon: number): Trend | nu
     Math.min(...points.map(([pLat, pLon]) => distanceKm(lat, lon, pLat, pLon)));
   const nowKm = closest(status.cold_pixels);
   const wasKm = closest(oldest.cells);
+  if ((Math.abs(nowKm - wasKm) / minutes) * 60 > MAX_STORM_SPEED_KMH) {
+    return { kind: nowKm < wasKm ? "formed_closer" : "dissipated", wasKm, minutes };
+  }
   const kind = nowKm <= wasKm - TREND_MIN_KM ? "approaching" : nowKm >= wasKm + TREND_MIN_KM ? "receding" : "steady";
   return { kind, wasKm, minutes };
 }
@@ -180,7 +190,7 @@ export interface Eta {
  * When the closest cold cloud tops might reach a point, if they keep their pace.
  *
  * Conservative on purpose: only when every scan (at least three) is closer than the one
- * before, so new cells popping up or old ones dying do not pass for movement. The range
+ * before, at a speed a storm can travel, so new cells popping up or old ones dying do not pass for movement. The range
  * comes from the slowest and fastest step speeds. It tracks the edge of the cold tops,
  * which is what reaches a place first. The range is never narrower than -20 % / +25 %. Experimental: to be checked against real arrivals.
  */
@@ -203,7 +213,7 @@ export function stormEta(status: Status, lat: number, lon: number): Eta | null {
   for (let i = 1; i < series.length; i++) {
     const hours = (series[i].time - series[i - 1].time) / 3_600_000;
     const closedKm = series[i - 1].km - series[i].km;
-    if (hours <= 0 || closedKm <= 0) return null;
+    if (hours <= 0 || closedKm <= 0 || closedKm / hours > MAX_STORM_SPEED_KMH) return null;
     stepSpeeds.push(closedKm / hours);
   }
   const hours = (series.at(-1)!.time - series[0].time) / 3_600_000;
