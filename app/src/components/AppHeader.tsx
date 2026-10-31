@@ -4,9 +4,8 @@ import { BoltIcon } from "./Icons";
 const UPDATE_EVERY_MIN = 10;
 
 /**
- * App name, the "experimental" label and when the next update is due.
- * The time of each source is shown next to the map (HomeView).
- * `now` is the shared clock (useNow): 0 until hydrated, when the next update is not shown yet.
+ * App name, the "experimental" label and the time of the data on screen.
+ * `now` is the shared clock (useNow): 0 until hydrated, when the time is not shown yet.
  */
 export function AppHeader({ status, state, now }: { status: Status | null; state: DataState; now: number }) {
   return (
@@ -19,19 +18,22 @@ export function AppHeader({ status, state, now }: { status: Status | null; state
             EXPERIMENTAL
           </span>
         </div>
-        {status && now > 0 && state !== "historical" && <NextUpdate status={status} now={now} />}
+        {status && now > 0 && state !== "historical" && <DataTime status={status} now={now} />}
       </div>
     </header>
   );
 }
 
-function NextUpdate({ status, now }: { status: Status; now: number }) {
+/**
+ * When the data on screen was observed (the cloud scan, the older of the two sources).
+ * After two missed runs it says so instead of showing a time that looks current.
+ */
+function DataTime({ status, now }: { status: Status; now: number }) {
   const due = new Date(status.data_until_utc).getTime() + UPDATE_EVERY_MIN * 60_000;
-  // A "next update" time in the past would claim freshness the data does not have.
   const overdue = now > due + 5 * 60_000;
   return (
     <span className="rounded-full border border-line bg-surface/90 px-2.5 py-1.5 font-mono text-xs text-soft">
-      {overdue ? "actualización atrasada" : `próx. ~${localTime(new Date(due).toISOString())}`}
+      {overdue ? "datos atrasados" : `datos ${localTime(status.latest_scan_utc)}`}
     </span>
   );
 }

@@ -88,11 +88,6 @@ export function HomeView() {
         >
           <LocateIcon />
         </button>
-        {status && (
-          <p className="pointer-events-none absolute -top-9 left-4 rounded-lg bg-bg/80 px-2 py-1 text-xs text-soft">
-            Nubes de las {localTime(status.latest_scan_utc)} · rayos hasta las {localTime(status.data_until_utc)}
-          </p>
-        )}
         <button
           type="button"
           onClick={() => setExpanded(!expanded)}
@@ -136,6 +131,11 @@ export function HomeView() {
         <Legend />
         {expanded && (
           <div id="storm-details" className="flex flex-col gap-3">
+            <p className="text-[13px] text-soft">
+              Colores de las nubes: más fría = más alta = tormenta más intensa. Datos de nubes de las{" "}
+              {status ? localTime(status.latest_scan_utc) : "—"} y de rayos hasta las{" "}
+              {status ? localTime(status.data_until_utc) : "—"}.
+            </p>
             {status && (
               <Stats status={status} activity={activity} current={state === "healthy" || state === "degraded"} />
             )}
@@ -220,6 +220,15 @@ function StateBanner(props: {
       </Link>
     );
   }
+  // With a place set, the sheet carries the detail: the banner shrinks to one line.
+  if (hasPlace && (status.level === "deep_convection" || status.level === "quiet")) {
+    return (
+      <CompactBanner
+        tone={status.level === "quiet" ? "quiet" : "convective"}
+        title={status.level === "quiet" ? "Área de alerta: sin actividad ahora" : "Área de alerta: nubes de tormenta"}
+      />
+    );
+  }
   if (status.level === "deep_convection") {
     return (
       <Banner tone="convective" title="Nubes de tormenta en el área monitoreada">
@@ -238,8 +247,7 @@ function StateBanner(props: {
   if (regional && regional.km > status.radius_km) {
     return (
       <Banner tone="quiet" title="Sin actividad observada en el área de alerta">
-        {!hasPlace &&
-          `Hay nubes de tormenta a ${Math.round(regional.km)} km al ${regional.direction} de Requínoa, fuera de los ${status.radius_km} km que vigilamos. `}
+        {`Hay nubes de tormenta a ${Math.round(regional.km)} km al ${regional.direction} de Requínoa, fuera de los ${status.radius_km} km que vigilamos. `}
         <ForecastNote />
       </Banner>
     );
@@ -261,6 +269,24 @@ function ForecastNote() {
       </Link>
       .
     </>
+  );
+}
+
+/** One line: the state of the alert area, and the way to the official warnings. */
+function CompactBanner({ tone, title }: { tone: "quiet" | "convective"; title: string }) {
+  const styles = tone === "quiet" ? "border-quiet-line bg-quiet-bg" : "border-[#6b4a14] bg-[#2e2210]";
+  const Icon = tone === "quiet" ? InfoIcon : CloudIcon;
+  return (
+    <div
+      className={`pointer-events-auto flex items-center gap-2.5 rounded-2xl border px-3.5 py-2 ${styles}`}
+      role="status"
+    >
+      <Icon size={18} className={`shrink-0 ${tone === "quiet" ? "text-quiet" : "text-convective"}`} />
+      <span className="grow text-sm font-semibold">{title}</span>
+      <Link href="/oficiales" className="flex min-h-9 shrink-0 items-center gap-0.5 text-[13px] font-semibold text-quiet">
+        Avisos oficiales <ChevronRightIcon size={14} />
+      </Link>
+    </div>
   );
 }
 
@@ -351,19 +377,18 @@ function PlaceSummary(props: {
     advice =
       status.level === "severe"
         ? "Se está intensificando. Si estás al aire libre, busca refugio."
-        : "Mantente atento por si se acerca.";
-    context = movement;
+        : (movement ?? "Mantente atento por si se acerca.");
     tone = status.level === "severe" ? "text-severe" : "text-convective";
   } else if (state === "healthy" && flash) {
     // No flash in the last 10 minutes, but one within the safety distance in the last 30.
     title = "Rayos recientes cerca de ti";
     advice = "La tormenta puede seguir activa aunque no veas rayos ahora.";
-    context = storm ? stormLine(storm, movement, "Nubes de tormenta más cercanas") : null;
     tone = "text-convective";
   } else if (state === "healthy") {
     title = `Sin actividad a menos de ${AROUND_KM} km`;
-    advice = "Revisamos el satélite cada 10 minutos.";
-    context = storm ? stormLine(storm, movement, "Nubes de tormenta más cercanas") : null;
+    advice = storm
+      ? stormLine(storm, movement, "Nubes de tormenta más cercanas")
+      : "El satélite no ve nubes de tormenta en la región.";
     tone = "text-quiet";
   } else {
     title = "No podemos confirmar el estado";
@@ -455,7 +480,6 @@ function Legend() {
   ];
   return (
     <div className="flex flex-col gap-1">
-      <p className="text-xs text-muted">Nubes: más fría = más alta = tormenta más intensa</p>
       <ul className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-soft" aria-label="Leyenda del mapa">
         {items.map((item) => (
           <li key={item.label} className="flex items-center gap-1.5">

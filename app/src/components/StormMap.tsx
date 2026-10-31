@@ -138,7 +138,7 @@ function supportsWebGL(): boolean {
 const never = () => () => {};
 
 /**
- * Room the banner on top and the sheet (with its time label) below take over the map,
+ * Room the banner on top and the sheet below take over the map,
  * measured live: their height changes with the text and with "Ver detalles".
  */
 function framePadding(m: maplibregl.Map) {
@@ -146,7 +146,9 @@ function framePadding(m: maplibregl.Map) {
   const top = document.getElementById("map-top-overlay")?.getBoundingClientRect().bottom ?? map.top + 200;
   const sheet = document.getElementById("storm-summary")?.getBoundingClientRect().top ?? map.bottom - 200;
   const margin = 32;
-  const vertical = { top: Math.max(0, top - map.top) + margin, bottom: Math.max(0, map.bottom - sheet) + 48 };
+  // Markers are drawn centred on their point: leave room so they are not cut by the overlays.
+  const clearance = 56;
+  const vertical = { top: Math.max(0, top - map.top) + clearance, bottom: Math.max(0, map.bottom - sheet) + clearance };
   // On very short screens, keep at least a third of the map for the framed area.
   const spare = map.height - vertical.top - vertical.bottom;
   const shrink = spare < map.height / 3 ? (map.height / 3 - spare) / 2 : 0;
