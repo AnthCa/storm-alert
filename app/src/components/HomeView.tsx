@@ -64,7 +64,10 @@ export function HomeView() {
         />
       </div>
 
-      <div className="pointer-events-none absolute inset-x-0 top-0 flex flex-col gap-2.5 px-4 pt-[max(1rem,env(safe-area-inset-top))]">
+      <div
+        id="map-top-overlay"
+        className="pointer-events-none absolute inset-x-0 top-0 flex flex-col gap-2.5 px-4 pt-[max(1rem,env(safe-area-inset-top))]"
+      >
         <AppHeader status={status} state={state} now={now} />
         <DemoBanner />
         <StateBanner status={status} state={state} error={error} now={now} hasPlace={!!place} />

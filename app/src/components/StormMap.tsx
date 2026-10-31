@@ -117,6 +117,27 @@ function supportsWebGL(): boolean {
 
 const never = () => () => {};
 
+/**
+ * Room the banner on top and the sheet (with its time label) below take over the map,
+ * measured live: their height changes with the text and with "Ver detalles".
+ */
+function framePadding(m: maplibregl.Map) {
+  const map = m.getContainer().getBoundingClientRect();
+  const top = document.getElementById("map-top-overlay")?.getBoundingClientRect().bottom ?? map.top + 200;
+  const sheet = document.getElementById("storm-summary")?.getBoundingClientRect().top ?? map.bottom - 200;
+  const margin = 32;
+  const vertical = { top: Math.max(0, top - map.top) + margin, bottom: Math.max(0, map.bottom - sheet) + 48 };
+  // On very short screens, keep at least a third of the map for the framed area.
+  const spare = map.height - vertical.top - vertical.bottom;
+  const shrink = spare < map.height / 3 ? (map.height / 3 - spare) / 2 : 0;
+  return {
+    top: Math.max(margin, vertical.top - shrink),
+    bottom: Math.max(margin, vertical.bottom - shrink),
+    left: margin,
+    right: margin,
+  };
+}
+
 /** Storms farther than this from the viewer are not worth zooming the map out for. */
 const STORM_FRAME_KM = 150;
 
@@ -301,7 +322,7 @@ function LiveMap({ status, place, onPick, summaryId }: Props) {
           [Math.min(p.lon, storm.lon), Math.min(p.lat, storm.lat)],
           [Math.max(p.lon, storm.lon), Math.max(p.lat, storm.lat)],
         ],
-        { padding: { top: 200, bottom: 200, left: 40, right: 40 }, maxZoom: 10, duration },
+        { padding: framePadding(m), maxZoom: 10, duration },
       );
     } else {
       m.easeTo({ center: [p.lon, p.lat], zoom: Math.max(m.getZoom(), 9), duration });
