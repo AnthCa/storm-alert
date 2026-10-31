@@ -37,14 +37,19 @@ create or replace function public.pilot_subscribe(
   code text, endpoint text, p256dh text, auth text, lat numeric, lon numeric, radius_km integer
 ) returns void
 language plpgsql security definer set search_path = public, extensions as $$
+#variable_conflict use_column
+-- Parameters share names with columns: unqualified names in SQL mean the column.
 begin
   if not exists (
-    select 1 from push_config where pilot_code_sha256 = encode(digest(code, 'sha256'), 'hex')
+    select 1 from push_config where pilot_code_sha256 = encode(digest(pilot_subscribe.code, 'sha256'), 'hex')
   ) then
     raise exception 'invalid pilot code' using errcode = '28000';
   end if;
   insert into push_subscriptions (endpoint, p256dh, auth, lat, lon, radius_km)
-  values (endpoint, p256dh, auth, round(lat, 2), round(lon, 2), radius_km)
+  values (
+    pilot_subscribe.endpoint, pilot_subscribe.p256dh, pilot_subscribe.auth,
+    round(pilot_subscribe.lat, 2), round(pilot_subscribe.lon, 2), pilot_subscribe.radius_km
+  )
   on conflict (endpoint) do update
     set p256dh = excluded.p256dh, auth = excluded.auth, lat = excluded.lat,
         lon = excluded.lon, radius_km = excluded.radius_km, active = true;
