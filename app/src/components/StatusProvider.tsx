@@ -63,10 +63,17 @@ export function StatusProvider({ children }: { children: React.ReactNode }) {
         })
         .catch((e: Error) => !cancelled && setError(e.message));
     load();
-    const timer = demo ? undefined : setInterval(load, POLL_MS);
+    if (demo) return () => void (cancelled = true);
+    const timer = setInterval(load, POLL_MS);
+    // Phones freeze timers in background tabs; refresh as soon as the app is visible again.
+    const onVisible = () => document.visibilityState === "visible" && load();
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("online", load);
     return () => {
       cancelled = true;
       clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("online", load);
     };
   }, [demo]);
 
