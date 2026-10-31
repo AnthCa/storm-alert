@@ -14,7 +14,8 @@ that the satellite signal was there about **50 minutes before**.
 | [`app`](app) | Next.js PWA in Spanish: live map, "your location", alert detail and how it works. Deployed on Vercel. |
 
 ```
-GOES-19 (NOAA, AWS) ──► GitHub Actions, every 10 min ──► status.json (GitHub Pages) ──► app (Vercel)
+Supabase pg_cron, every 10 min ──► workflow_dispatch
+GOES-19 (NOAA, AWS) ──► GitHub Actions ──► status.json (GitHub Pages) ──► app (Vercel)
                         Python: cloud tops + lightning jumps
 ```
 
