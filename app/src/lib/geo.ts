@@ -1,4 +1,4 @@
-import type { Status } from "./status";
+import { localTime, type Status } from "./status";
 
 const EARTH_RADIUS_KM = 6371;
 const toRad = (deg: number) => (deg * Math.PI) / 180;
@@ -127,6 +127,85 @@ export function stormTrend(status: Status, lat: number, lon: number): Trend | nu
   const wasKm = closest(oldest.cells);
   const kind = nowKm <= wasKm - TREND_MIN_KM ? "approaching" : nowKm >= wasKm + TREND_MIN_KM ? "receding" : "steady";
   return { kind, wasKm, minutes };
+}
+
+/** Arrival estimates only for storms between these distances; farther, the error is too large. */
+export const ETA_MIN_KM = NEAR_KM;
+export const ETA_MAX_KM = 150;
+/** Slower than this, "arrival" is not a meaningful idea within the next hours. */
+const ETA_MIN_SPEED_KMH = 10;
+export const ETA_MAX_MIN = 180;
+const ETA_MARGIN_LOW = 0.8;
+const ETA_MARGIN_HIGH = 1.25;
+
+export interface Eta {
+  speedKmh: number;
+  /** Range of minutes until the closest cold tops reach the point, if they keep the observed pace.
+   * fromMin is at most ETA_MAX_MIN; toMin may exceed it. */
+  fromMin: number;
+  toMin: number;
+}
+
+/**
+ * When the closest cold cloud tops might reach a point, if they keep their pace.
+ *
+ * Conservative on purpose: only when every scan (at least three) is closer than the one
+ * before, so new cells popping up or old ones dying do not pass for movement. The range
+ * comes from the slowest and fastest step speeds. It tracks the edge of the cold tops,
+ * which is what reaches a place first. The range is never narrower than -20 % / +25 %. Experimental: to be checked against real arrivals.
+ */
+export function stormEta(status: Status, lat: number, lon: number): Eta | null {
+  const scans = [
+    ...status.cold_history.map((scan) => ({ time: Date.parse(scan.time_utc), points: scan.cells })),
+    { time: Date.parse(status.latest_scan_utc), points: status.cold_pixels },
+  ];
+  if (scans.length < 3 || scans.some((scan) => scan.points.length === 0)) return null;
+  const series = scans.map((scan) => ({
+    time: scan.time,
+    km: Math.min(...scan.points.map(([pLat, pLon]) => distanceKm(lat, lon, pLat, pLon))),
+  }));
+
+  const nowKm = series.at(-1)!.km;
+  if (nowKm <= ETA_MIN_KM || nowKm > ETA_MAX_KM) return null;
+  if (series[0].km - nowKm < TREND_MIN_KM) return null;
+
+  const stepSpeeds: number[] = [];
+  for (let i = 1; i < series.length; i++) {
+    const hours = (series[i].time - series[i - 1].time) / 3_600_000;
+    const closedKm = series[i - 1].km - series[i].km;
+    if (hours <= 0 || closedKm <= 0) return null;
+    stepSpeeds.push(closedKm / hours);
+  }
+  const hours = (series.at(-1)!.time - series[0].time) / 3_600_000;
+  const speedKmh = (series[0].km - nowKm) / hours;
+  if (speedKmh < ETA_MIN_SPEED_KMH) return null;
+
+  // Even a perfectly steady approach gets a margin: cells are ~5 km and storms change.
+  const centralMin = (nowKm / speedKmh) * 60;
+  const fromMin = Math.min((nowKm / Math.max(...stepSpeeds)) * 60, centralMin * ETA_MARGIN_LOW);
+  const toMin = Math.max((nowKm / Math.min(...stepSpeeds)) * 60, centralMin * ETA_MARGIN_HIGH);
+  if (fromMin > ETA_MAX_MIN) return null;
+  return { speedKmh, fromMin, toMin };
+}
+
+/** Clock time in Chile, rounded to 10 minutes: an estimate should not look minute-exact. */
+function roughTime(ms: number): string {
+  const step = 10 * 60_000;
+  return localTime(new Date(Math.round(ms / step) * step).toISOString());
+}
+
+/**
+ * "Se acercan a ~60 km/h. Si mantienen el ritmo, podrían llegar entre las 14:20 y las 14:50."
+ * Times count from the scan, not from now, so satellite latency does not shift them.
+ */
+export function etaText(eta: Eta, scanUtc: string): string {
+  const scan = Date.parse(scanUtc);
+  const from = roughTime(scan + eta.fromMin * 60_000);
+  const to = roughTime(scan + eta.toMin * 60_000);
+  const when =
+    eta.toMin > ETA_MAX_MIN ? `después de las ${from}` : from === to ? `cerca de las ${from}` : `entre las ${from} y las ${to}`;
+  const speed = Math.max(5, Math.round(eta.speedKmh / 5) * 5);
+  return `Se acercan a ~${speed} km/h. Si mantienen el ritmo, podrían llegar ${when} (estimación, puede cambiar).`;
 }
 
 /** Two decimals is about 1 km: enough to measure distance to a storm, too coarse to find a home. */

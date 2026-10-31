@@ -8,6 +8,8 @@ import {
   insideObservedArea,
   nearestStorm,
   nearestTown,
+  etaText,
+  stormEta,
   stormTrend,
 } from "./geo";
 import { shareMessage } from "./share";
@@ -214,5 +216,43 @@ describe("share message", () => {
     expect(text).toContain("sin actividad convectiva");
     expect(text).toContain("no oficial");
     expect(text).not.toMatch(/-34\.|-70\./);
+  });
+});
+
+describe("arrival estimate", () => {
+  // Points due west of Requínoa, `km` away along its latitude.
+  const west = (km: number): [number, number, number] => [-34.29, -70.82 - km / 92, -42];
+  const scans = (...kms: number[]) =>
+    kms.map((km, i) => ({ time_utc: `2026-10-26T19:${String(20 + i * 10).padStart(2, "0")}:20+00:00`, cells: [west(km)] }));
+  const at = (history: number[], nowKm: number) =>
+    status({ cold_history: scans(...history), cold_pixels: [west(nowKm)], latest_scan_utc: "2026-10-26T19:50:20+00:00" });
+
+  it("estimates arrival when the storm closes in steadily", () => {
+    const eta = stormEta(at([130, 120, 110], 100), ...REQUINOA);
+    expect(eta?.speedKmh).toBeCloseTo(60, 0);
+    // 100 km at 60 km/h is 100 min, widened to the minimum -20 % / +25 % margin.
+    expect(eta?.fromMin).toBeCloseTo(80, 0);
+    expect(eta?.toMin).toBeCloseTo(125, 0);
+    // Scan at 19:50 UTC (16:50 in Chile) + 80 to 125 min.
+    expect(etaText(eta!, "2026-10-26T19:50:20+00:00")).toBe(
+      "Se acercan a ~60 km/h. Si mantienen el ritmo, podrían llegar entre las 18:10 y las 19:00 (estimación, puede cambiar).",
+    );
+  });
+
+  it("gives no estimate when the distance jumps back and forth", () => {
+    expect(stormEta(at([130, 110, 120], 100), ...REQUINOA)).toBeNull();
+  });
+
+  it("gives no estimate with too few scans, too far, too slow or already here", () => {
+    expect(stormEta(at([110], 100), ...REQUINOA)).toBeNull();
+    expect(stormEta(at([230, 220, 210], 200), ...REQUINOA)).toBeNull();
+    expect(stormEta(at([103, 102, 101], 100), ...REQUINOA)).toBeNull();
+    expect(stormEta(at([30, 20, 12], 5), ...REQUINOA)).toBeNull();
+  });
+
+  it("gives clock times from the scan, open-ended when the slow end is too far", () => {
+    const scan = "2026-10-26T19:50:20+00:00";
+    expect(etaText({ speedKmh: 61, fromMin: 38, toMin: 52 }, scan)).toContain("entre las 17:30 y las 17:40");
+    expect(etaText({ speedKmh: 30, fromMin: 120, toMin: 400 }, scan)).toContain("después de las 18:50");
   });
 });

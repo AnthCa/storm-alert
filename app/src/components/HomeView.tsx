@@ -8,9 +8,11 @@ import {
   AROUND_KM,
   NEAR_KM,
   activityAt,
+  etaText,
   insideObservedArea,
   nearestStorm,
   nearestTown,
+  stormEta,
   stormTrend,
   type Activity,
   type StormNearby,
@@ -296,9 +298,9 @@ function trendText(trend: Trend | null): string | null {
   return `${verb}: hace ${trend.minutes} min estaban a ${Math.round(trend.wasKm)} km.`;
 }
 
-function stormLine(storm: StormNearby | null, trend: Trend | null, prefix: string): string {
+function stormLine(storm: StormNearby | null, movement: string | null, prefix: string): string {
   if (!storm) return "El satélite no ve nubes de tormenta en la región.";
-  return [`${prefix}: ${Math.round(storm.km)} km al ${storm.direction}.`, trendText(trend)].filter(Boolean).join(" ");
+  return [`${prefix}: ${Math.round(storm.km)} km al ${storm.direction}.`, movement].filter(Boolean).join(" ");
 }
 
 function PlaceSummary(props: {
@@ -315,7 +317,9 @@ function PlaceSummary(props: {
   const { level, nearest } = activity;
   const current = state === "healthy" || state === "degraded";
   const storm = nearestStorm(status, place.lat, place.lon);
-  const trend = stormTrend(status, place.lat, place.lon);
+  const eta = stormEta(status, place.lat, place.lon);
+  // A steady approach gets an arrival range; otherwise just the observed movement.
+  const movement = eta ? etaText(eta, status.latest_scan_utc) : trendText(stormTrend(status, place.lat, place.lon));
   const observed = insideObservedArea(status, place.lat, place.lon);
   let title: string;
   let advice: string;
@@ -325,7 +329,7 @@ function PlaceSummary(props: {
   if (level === "outside" && observed) {
     title = storm ? `Nubes de tormenta a ${Math.round(storm.km)} km` : "Sin nubes de tormenta cerca";
     advice = storm
-      ? [`Al ${storm.direction} de ti.`, trendText(trend)].filter(Boolean).join(" ")
+      ? [`Al ${storm.direction} de ti.`, movement].filter(Boolean).join(" ")
       : "El satélite no ve nubes de tormenta en la región.";
     context = `Estás fuera del área de alerta (${status.radius_km} km alrededor de Requínoa): aquí solo mostramos lo que ve el satélite. Revisa los avisos oficiales.`;
     tone = storm && storm.km <= AROUND_KM ? "text-convective" : "text-soft";
@@ -343,12 +347,12 @@ function PlaceSummary(props: {
       status.level === "severe"
         ? "Se está intensificando. Si estás al aire libre, busca refugio."
         : "Mantente atento por si se acerca.";
-    context = trendText(trend);
+    context = movement;
     tone = status.level === "severe" ? "text-severe" : "text-convective";
   } else if (state === "healthy") {
     title = `Sin actividad a menos de ${AROUND_KM} km`;
     advice = "Revisamos el satélite cada 10 minutos.";
-    context = storm ? stormLine(storm, trend, "Nubes de tormenta más cercanas") : null;
+    context = storm ? stormLine(storm, movement, "Nubes de tormenta más cercanas") : null;
     tone = "text-quiet";
   } else {
     title = "No podemos confirmar el estado";
