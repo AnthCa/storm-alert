@@ -538,7 +538,7 @@ function Legend() {
     { label: "−38° tormenta", className: "bg-convective" },
     { label: "−44° fuerte", className: "bg-[#f0644f]" },
     { label: "−50° muy fuerte", className: "bg-[#c2261b]" },
-    { label: "Rayo", className: "border-[1.5px] border-bolt" },
+    { label: "Rayo", className: "size-1.5! bg-[#FFF3A6] shadow-[0_0_6px_2px_rgba(255,225,77,0.5)]" },
   ];
   return (
     <div className="flex flex-col gap-1">

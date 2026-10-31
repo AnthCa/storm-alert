@@ -60,12 +60,37 @@ function boxOutline(box: Bbox): Feature {
   };
 }
 
+/** ABI pixels are ~2 km apart on a grid slightly rotated from lat/lon; a bit more avoids gaps. */
+const PIXEL_KM = 2.3;
+
+/** The ground footprint of one satellite pixel, so pixels tile into a continuous image. */
+function pixelSquare(lat: number, lon: number, t: number): Feature {
+  const dLat = PIXEL_KM / 2 / KM_PER_DEG_LAT;
+  const dLon = dLat / Math.cos((lat * Math.PI) / 180);
+  return {
+    type: "Feature",
+    geometry: {
+      type: "Polygon",
+      coordinates: [
+        [
+          [lon - dLon, lat - dLat],
+          [lon + dLon, lat - dLat],
+          [lon + dLon, lat + dLat],
+          [lon - dLon, lat + dLat],
+          [lon - dLon, lat - dLat],
+        ],
+      ],
+    },
+    properties: { t },
+  };
+}
+
 /** Live data, or one frame of the replay while it plays. */
 function stormData(status: Status | null, replay: ReplayFrame | null) {
   const cold = replay?.cold ?? status?.cold_pixels ?? [];
   const flashes = replay?.flashes ?? status?.recent_flashes ?? [];
   return {
-    cold: collection(cold.map(([lat, lon, t]) => point(lat, lon, { t }))),
+    cold: collection(cold.flatMap(([lat, lon, t]) => [point(lat, lon, { t }), pixelSquare(lat, lon, t)])),
     flashes: collection(flashes.map(([lat, lon]) => point(lat, lon))),
     area: collection(status ? [ring(status.center[0], status.center[1], status.radius_km)] : []),
     outside: collection(status ? [outsideMask(status.center[0], status.center[1], status.radius_km)] : []),
@@ -168,49 +193,58 @@ function framePadding(m: maplibregl.Map) {
 
 const COLD_LAYERS = ["cold-a", "cold-b"] as const;
 type ColdLayer = (typeof COLD_LAYERS)[number];
-const COLD_OPACITY = 0.7;
+const COLD_OPACITY = 0.88; // high enough that the slight tile overlaps do not show as a grid
 const HALO_OPACITY = 0.22;
 /** Long enough to read as one image dissolving into the next, like a radar loop. */
 const FADE_MS = 900;
 
-/** A soft halo under the cloud pixels, then the pixels: together they read as a cloud. */
+/**
+ * A soft halo from the pixel centres, then the pixels as tiles: together they read as a
+ * continuous satellite image with soft edges. Drawn under the base map's labels.
+ */
 function addColdLayers(m: maplibregl.Map, id: ColdLayer, visible: 0 | 1) {
   const fade = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : FADE_MS;
   const color: maplibregl.ExpressionSpecification = ["step", ["get", "t"], "#C2261B", -50, "#F0644F", -44, "#F2A53A"];
   // Colder tops on top, so a storm's core stays visible inside its anvil.
-  const layout = { "circle-sort-key": ["-", 0, ["get", "t"]] as maplibregl.ExpressionSpecification };
-  m.addLayer({
-    id: `${id}-halo`,
-    type: "circle",
-    source: id,
-    layout,
-    paint: {
-      "circle-radius": ["interpolate", ["exponential", 2], ["zoom"], 6, 4, 12, 140],
-      "circle-blur": 1,
-      "circle-color": color,
-      "circle-opacity": HALO_OPACITY * visible,
-      "circle-opacity-transition": { duration: fade, delay: 0 },
+  const sortKey: maplibregl.ExpressionSpecification = ["-", 0, ["get", "t"]];
+  const labels = m.getStyle().layers.find((layer) => layer.type === "symbol")?.id;
+  m.addLayer(
+    {
+      id: `${id}-halo`,
+      type: "circle",
+      source: id,
+      filter: ["==", ["geometry-type"], "Point"],
+      layout: { "circle-sort-key": sortKey },
+      paint: {
+        "circle-radius": ["interpolate", ["exponential", 2], ["zoom"], 6, 3, 12, 110],
+        "circle-blur": 1,
+        "circle-color": color,
+        "circle-opacity": HALO_OPACITY * visible,
+        "circle-opacity-transition": { duration: fade, delay: 0 },
+      },
     },
-  });
-  m.addLayer({
-    id,
-    type: "circle",
-    source: id,
-    layout,
-    paint: {
-      // Each pixel drawn at its ground size (~1.5 km radius, doubling per zoom level) and
-      // softened, so neighbouring pixels merge into one cloud shape instead of dots.
-      "circle-radius": ["interpolate", ["exponential", 2], ["zoom"], 6, 1.6, 12, 60],
-      "circle-blur": ["interpolate", ["linear"], ["zoom"], 6, 0.4, 10, 0.7],
-      "circle-color": color,
-      "circle-opacity": COLD_OPACITY * visible,
-      "circle-opacity-transition": { duration: fade, delay: 0 },
+    labels,
+  );
+  m.addLayer(
+    {
+      id,
+      type: "fill",
+      source: id,
+      filter: ["==", ["geometry-type"], "Polygon"],
+      layout: { "fill-sort-key": sortKey },
+      paint: {
+        "fill-color": color,
+        "fill-opacity": COLD_OPACITY * visible,
+        "fill-opacity-transition": { duration: fade, delay: 0 },
+        "fill-antialias": false,
+      },
     },
-  });
+    labels,
+  );
 }
 
 function setColdOpacity(m: maplibregl.Map, id: ColdLayer, visible: 0 | 1) {
-  m.setPaintProperty(id, "circle-opacity", COLD_OPACITY * visible);
+  m.setPaintProperty(id, "fill-opacity", COLD_OPACITY * visible);
   m.setPaintProperty(`${id}-halo`, "circle-opacity", HALO_OPACITY * visible);
 }
 
@@ -324,9 +358,9 @@ function LiveMap({ status, place, onPick, summaryId, replay }: Props) {
         type: "circle",
         source: "flashes",
         paint: {
-          "circle-radius": ["interpolate", ["linear"], ["zoom"], 7, 5, 11, 12],
+          "circle-radius": ["interpolate", ["linear"], ["zoom"], 7, 3.5, 11, 8],
           "circle-color": "#FFE14D",
-          "circle-opacity": 0.25,
+          "circle-opacity": 0.2,
           "circle-blur": 1,
         },
       });
@@ -335,10 +369,11 @@ function LiveMap({ status, place, onPick, summaryId, replay }: Props) {
         type: "circle",
         source: "flashes",
         paint: {
-          "circle-radius": ["interpolate", ["linear"], ["zoom"], 7, 1.5, 11, 3.5],
-          "circle-color": "rgba(0,0,0,0)",
-          "circle-stroke-color": "#FFE14D",
-          "circle-stroke-width": 1.5,
+          // Small bright dots: hundreds of rings hid the storm under them.
+          "circle-radius": ["interpolate", ["linear"], ["zoom"], 7, 1.3, 11, 2.6],
+          "circle-color": "#FFF3A6",
+          "circle-stroke-color": "#FFD21F",
+          "circle-stroke-width": 0.6,
         },
       });
       m.addLayer({
