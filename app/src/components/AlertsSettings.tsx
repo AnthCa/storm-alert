@@ -56,6 +56,14 @@ export function AlertsSettings() {
       setActive({ radius, place: nearestTown(place.lat, place.lon) ?? "tu ubicación" });
     } catch (error) {
       const { name, message } = error as Error;
+      // Android browsers deliver web push through Google; phones without Google services
+      // (recent Huawei, for one) cannot receive it at all.
+      if (name === "AbortError" && /push service/i.test(message)) {
+        setMessage(
+          "Este teléfono no puede recibir notificaciones web: en Android llegan a través de los servicios de Google, que algunos equipos (como los Huawei recientes) no tienen. Estamos preparando otra forma de avisarte.",
+        );
+        return;
+      }
       // During the pilot the technical reason is shown too, so testers can report it.
       setMessage(ERRORS[message] ?? `No pudimos activarlas. Inténtalo de nuevo en un momento. (${name}: ${message})`);
     } finally {
