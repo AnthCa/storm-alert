@@ -4,7 +4,7 @@ import maplibregl, { type GeoJSONSource } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { useEffect, useRef, useSyncExternalStore } from "react";
 import { NEAR_KM, circleRing, nearestStorm } from "@/lib/geo";
-import type { Status } from "@/lib/status";
+import type { Bbox, Status } from "@/lib/status";
 import type { Place } from "./StatusProvider";
 
 // Free vector tiles, no API key (https://openfreemap.org).
@@ -40,12 +40,32 @@ function outsideMask(lat: number, lon: number, km: number): Feature {
   };
 }
 
+/** Edge of the area where clouds and flashes are mapped: beyond it the map is blank, not clear. */
+function boxOutline(box: Bbox): Feature {
+  const { lat_min, lat_max, lon_min, lon_max } = box;
+  return {
+    type: "Feature",
+    geometry: {
+      type: "LineString",
+      coordinates: [
+        [lon_min, lat_min],
+        [lon_max, lat_min],
+        [lon_max, lat_max],
+        [lon_min, lat_max],
+        [lon_min, lat_min],
+      ],
+    },
+    properties: {},
+  };
+}
+
 function stormData(status: Status | null) {
   return {
     cold: collection((status?.cold_pixels ?? []).map(([lat, lon, t]) => point(lat, lon, { t }))),
     flashes: collection((status?.recent_flashes ?? []).map(([lat, lon]) => point(lat, lon))),
     area: collection(status ? [ring(status.center[0], status.center[1], status.radius_km)] : []),
     outside: collection(status ? [outsideMask(status.center[0], status.center[1], status.radius_km)] : []),
+    observed: collection(status?.observed_bbox ? [boxOutline(status.observed_bbox)] : []),
   };
 }
 
@@ -188,6 +208,7 @@ function LiveMap({ status, place, onPick, summaryId }: Props) {
       const data = stormData(latest.current.status);
       m.addSource("outside", { type: "geojson", data: data.outside });
       m.addSource("area", { type: "geojson", data: data.area });
+      m.addSource("observed", { type: "geojson", data: data.observed });
       m.addSource("cold", { type: "geojson", data: data.cold });
       m.addSource("flashes", { type: "geojson", data: data.flashes });
       m.addSource("me-ring", { type: "geojson", data: collection([]) });
@@ -205,6 +226,39 @@ function LiveMap({ status, place, onPick, summaryId }: Props) {
         type: "line",
         source: "area",
         paint: { "line-color": "#7A8491", "line-width": 1.5, "line-dasharray": [3, 3] },
+      });
+      m.addLayer({
+        id: "area-label",
+        type: "symbol",
+        source: "area",
+        layout: {
+          "symbol-placement": "line",
+          "symbol-spacing": 400,
+          "text-field": "Área de alerta",
+          "text-font": LABEL_FONT,
+          "text-size": 11,
+        },
+        paint: { "text-color": "#A9B2BC", "text-halo-color": "#0e1116", "text-halo-width": 1.5 },
+      });
+      m.addLayer({
+        id: "observed",
+        type: "line",
+        source: "observed",
+        paint: { "line-color": "#7A8491", "line-width": 1, "line-opacity": 0.6, "line-dasharray": [1, 3] },
+      });
+      m.addLayer({
+        id: "observed-label",
+        type: "symbol",
+        source: "observed",
+        layout: {
+          "symbol-placement": "line",
+          "symbol-spacing": 350,
+          "text-field": "Sin datos fuera de este recuadro",
+          "text-font": LABEL_FONT,
+          "text-size": 10,
+          "text-offset": [0, -0.8],
+        },
+        paint: { "text-color": "#8A949F", "text-halo-color": "#0e1116", "text-halo-width": 1.5 },
       });
       m.addLayer({
         id: "cold",
@@ -291,6 +345,7 @@ function LiveMap({ status, place, onPick, summaryId }: Props) {
     const data = stormData(latest.current.status);
     (m.getSource("outside") as GeoJSONSource).setData(data.outside);
     (m.getSource("area") as GeoJSONSource).setData(data.area);
+    (m.getSource("observed") as GeoJSONSource).setData(data.observed);
     (m.getSource("cold") as GeoJSONSource).setData(data.cold);
     (m.getSource("flashes") as GeoJSONSource).setData(data.flashes);
     const p = latest.current.place;
