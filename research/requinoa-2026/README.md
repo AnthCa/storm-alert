@@ -110,6 +110,9 @@ Leaflet map, `status.html`, with these features:
 - Thinned cold cloud tops of the three previous scans (`cold_history`, ~5 km
   cells), so the app can tell whether storms approach a place. Display only:
   the alert rule does not read it.
+- `flash_cells_30min`: the latest flash of the last 30 minutes per ~2 km cell,
+  with its age in minutes, for the "wait 30 minutes after the last flash"
+  lightning-safety advice.
 - `observed_bbox`: the box where clouds and flashes are mapped. It is wider
   than the 50 km alert circle; outside the circle there is no alert level.
 - A "your location" panel. Viewers can use GPS, tap the map or drag a point,

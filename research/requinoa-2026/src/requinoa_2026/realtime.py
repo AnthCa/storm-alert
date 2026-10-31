@@ -32,7 +32,7 @@ LOOKBACK = timedelta(minutes=45)
 ALERT_MEMORY = pd.Timedelta("30min")
 CYCLE_S = 600
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 # Bump whenever the alert rule or its thresholds change (see false_alarms.py).
 ALGORITHM_VERSION = "2026.10-r1"
 
@@ -49,6 +49,10 @@ RECENT_BINS = 6
 # Thinned to cells of this size (~5 km) to keep status.json small.
 HISTORY_SCANS = 3
 HISTORY_CELL_DEG = 0.05
+# Lightning safety advice ("wait 30 minutes after the last flash") needs when the last
+# flashes fell. Thinned to ~2 km cells, keeping each cell's most recent flash.
+FLASH_SAFETY_WINDOW = pd.Timedelta("30min")
+FLASH_CELL_DEG = 0.02
 
 
 def classify(tops: pd.DataFrame, counts: pd.Series, at: pd.Timestamp) -> tuple[str, list[pd.Timestamp]]:
@@ -175,6 +179,25 @@ def cold_history(abi: xr.Dataset, scans: int = HISTORY_SCANS) -> list[dict]:
     ]
 
 
+def latest_flash_cells(
+    flashes: pd.DataFrame, data_end: pd.Timestamp, window: pd.Timedelta = FLASH_SAFETY_WINDOW
+) -> list[list[float]]:
+    """[lat, lon, minutes before data_end] of the latest flash per ~2 km cell in the window."""
+    recent = flashes[flashes.time >= data_end - window]
+    if recent.empty:
+        return []
+    cells = (
+        recent.assign(
+            lat=(recent.lat / FLASH_CELL_DEG).round() * FLASH_CELL_DEG,
+            lon=(recent.lon / FLASH_CELL_DEG).round() * FLASH_CELL_DEG,
+        )
+        .groupby(["lat", "lon"], as_index=False)["time"]
+        .max()
+    )
+    ages = (data_end - cells.time).dt.total_seconds() / 60
+    return [[round(float(la), 3), round(float(lo), 3), round(float(a), 1)] for la, lo, a in zip(cells.lat, cells.lon, ages)]
+
+
 def map_layers(abi: xr.Dataset, flashes: pd.DataFrame, data_end: pd.Timestamp) -> dict:
     """Cold cloud-top pixels of the latest scan and flashes of the last 10 minutes.
 
@@ -194,6 +217,7 @@ def map_layers(abi: xr.Dataset, flashes: pd.DataFrame, data_end: pd.Timestamp) -
         "cold_pixels": cold_pixels,
         "cold_history": cold_history(abi),
         "recent_flashes": recent[["lat", "lon"]].round(3).values.tolist(),
+        "flash_cells_30min": latest_flash_cells(flashes, data_end),
     }
 
 

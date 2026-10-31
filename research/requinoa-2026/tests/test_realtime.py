@@ -2,7 +2,15 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 
-from requinoa_2026.realtime import classify, cold_cells, cold_history, complete_bins, public_level, source_health
+from requinoa_2026.realtime import (
+    classify,
+    cold_cells,
+    cold_history,
+    complete_bins,
+    latest_flash_cells,
+    public_level,
+    source_health,
+)
 from test_false_alarms import jumping_counts, tops, ts
 
 
@@ -111,3 +119,19 @@ def test_history_skips_the_latest_scan_and_keeps_the_last_three():
     ]
     assert history[0]["cells"] == []
     assert history[-1]["cells"][0][2] == -42.0
+
+
+def test_flash_cells_keep_the_latest_flash_per_cell_within_thirty_minutes():
+    flashes = pd.DataFrame(
+        {
+            "time": [ts("19:00"), ts("19:20"), ts("19:24"), ts("19:28")],
+            "lat": [-34.30, -34.30, -34.301, -34.50],
+            "lon": [-70.80, -70.80, -70.801, -70.60],
+        }
+    )
+    cells = latest_flash_cells(flashes, data_end=ts("19:30"))
+    assert sorted(c[2] for c in cells) == [2.0, 6.0]  # 19:00 is too old; 19:20 and 19:24 share a cell
+
+
+def test_no_flashes_no_cells():
+    assert latest_flash_cells(EMPTY, data_end=ts("19:30")) == []
