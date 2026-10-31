@@ -41,3 +41,15 @@ jobs:
           path: research/requinoa-2026/site
       - id: deploy
         uses: actions/deploy-pages@v4
+      # Pilot Web Push for invited testers. Off unless the PUSH_ENABLED variable is
+      # "true" (the kill switch), and never fails the map update.
+      - name: Send pilot notifications
+        if: vars.PUSH_ENABLED == 'true'
+        continue-on-error: true
+        run: uv run requinoa-push
+        env:
+          PUSH_ENABLED: ${{ vars.PUSH_ENABLED }}
+          PUSH_SENDER_TOKEN: ${{ secrets.PUSH_SENDER_TOKEN }}
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}

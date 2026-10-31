@@ -18,6 +18,7 @@ dependencies = [
     "metpy>=1.7.1",
     "netcdf4>=1.7.5.1.post1",
     "pyproj>=3.8.0",
+    "pywebpush>=2.0.0",
     "s3fs>=2026.9.0",
     "xarray>=2026.9.0",
 ]
@@ -28,6 +29,7 @@ requinoa-analyze = "requinoa_2026.analyze:main"
 requinoa-goes = "requinoa_2026.goes:main"
 requinoa-satellite = "requinoa_2026.satellite_analysis:main"
 requinoa-false-alarms = "requinoa_2026.false_alarms:main"
+requinoa-push = "requinoa_2026.push:main"
 requinoa-realtime = "requinoa_2026.realtime:main"
 
 [build-system]
