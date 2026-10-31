@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
+import { IBM_Plex_Mono, IBM_Plex_Sans, Space_Grotesk } from "next/font/google";
 import { BottomNav } from "@/components/BottomNav";
 import { ServiceWorker } from "@/components/ServiceWorker";
 import { StatusProvider } from "@/components/StatusProvider";
@@ -10,6 +10,13 @@ const plexSans = IBM_Plex_Sans({
   variable: "--font-plex-sans",
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
+});
+
+// Brand typeface, for the wordmark only.
+const spaceGrotesk = Space_Grotesk({
+  variable: "--font-space-grotesk",
+  subsets: ["latin"],
+  weight: ["700"],
 });
 
 const plexMono = IBM_Plex_Mono({
@@ -35,7 +42,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="es" className={`${plexSans.variable} ${plexMono.variable} antialiased`}>
+    <html lang="es" className={`${plexSans.variable} ${plexMono.variable} ${spaceGrotesk.variable} antialiased`}>
       <body className="min-h-dvh font-sans">
         <StatusProvider>
           {children}

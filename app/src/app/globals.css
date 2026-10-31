@@ -18,7 +18,9 @@
   --color-severe-bg: #3a1512;
   --color-accent: #1f6bd1; /* white text on it: 5.1:1 (AA) */
   --color-bolt: #ffe14d;
+  --color-signal: #38d6e8; /* brand: the viewer's dot in the logo */
   --font-sans: var(--font-plex-sans);
+  --font-brand: var(--font-space-grotesk);
   --font-mono: var(--font-plex-mono);
 }
 
