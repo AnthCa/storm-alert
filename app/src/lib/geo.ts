@@ -86,13 +86,15 @@ export function activityAt(status: Status, lat: number, lon: number): Activity {
 export interface StormNearby {
   km: number;
   direction: string;
+  lat: number;
+  lon: number;
 }
 
 export function nearestStorm(status: Status, lat: number, lon: number): StormNearby | null {
   let best: StormNearby | null = null;
   for (const [pLat, pLon] of [...status.cold_pixels, ...status.recent_flashes]) {
     const km = distanceKm(lat, lon, pLat, pLon);
-    if (!best || km < best.km) best = { km, direction: direction(lat, lon, pLat, pLon) };
+    if (!best || km < best.km) best = { km, direction: direction(lat, lon, pLat, pLon), lat: pLat, lon: pLon };
   }
   return best;
 }

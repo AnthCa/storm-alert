@@ -65,7 +65,7 @@ export function HomeView() {
       <div className="pointer-events-none absolute inset-x-0 top-0 flex flex-col gap-2.5 px-4 pt-[max(1rem,env(safe-area-inset-top))]">
         <AppHeader status={status} state={state} now={now} />
         <DemoBanner />
-        <StateBanner status={status} state={state} error={error} now={now} />
+        <StateBanner status={status} state={state} error={error} now={now} hasPlace={!!place} />
       </div>
 
       <section
@@ -159,8 +159,15 @@ function problemsText(status: Status): string {
   return parts.length ? `${parts.join(", ")}.` : "";
 }
 
-function StateBanner(props: { status: Status | null; state: DataState; error: string | null; now: number }) {
-  const { status, state, error, now } = props;
+function StateBanner(props: {
+  status: Status | null;
+  state: DataState;
+  error: string | null;
+  now: number;
+  /** With a place set, the sheet already gives the distance to the nearest storm. */
+  hasPlace: boolean;
+}) {
+  const { status, state, error, now, hasPlace } = props;
   if (!status) {
     return (
       <Banner tone="neutral" title={error ? "No pudimos cargar los datos" : "Cargando datos del satélite…"}>
@@ -220,8 +227,8 @@ function StateBanner(props: { status: Status | null; state: DataState; error: st
   if (regional && regional.km > status.radius_km) {
     return (
       <Banner tone="quiet" title="Sin actividad en el área de alerta">
-        Hay nubes de tormenta a {Math.round(regional.km)} km al {regional.direction} de Requínoa, fuera de los{" "}
-        {status.radius_km} km que vigilamos.
+        {!hasPlace &&
+          `Hay nubes de tormenta a ${Math.round(regional.km)} km al ${regional.direction} de Requínoa, fuera de los ${status.radius_km} km que vigilamos.`}
       </Banner>
     );
   }
@@ -261,18 +268,18 @@ function Banner({
   );
 }
 
-/** "Se acerca: hace 30 min estaba a 62 km." Observed movement of the closest cold tops. */
+/** "Se acercan: hace 30 min estaban a 62 km." Observed movement of the closest cold tops. */
 function trendText(trend: Trend | null): string | null {
   if (!trend) return null;
-  if (trend.kind === "new") return `Se formó en los últimos ${trend.minutes} min.`;
+  if (trend.kind === "new") return `Se formaron en los últimos ${trend.minutes} min.`;
   if (trend.kind === "steady") return `Sin desplazamiento claro en ${trend.minutes} min.`;
-  const verb = trend.kind === "approaching" ? "Se acerca" : "Se aleja";
-  return `${verb}: hace ${trend.minutes} min estaba a ${Math.round(trend.wasKm)} km.`;
+  const verb = trend.kind === "approaching" ? "Se acercan" : "Se alejan";
+  return `${verb}: hace ${trend.minutes} min estaban a ${Math.round(trend.wasKm)} km.`;
 }
 
 function stormLine(storm: StormNearby | null, trend: Trend | null, prefix: string): string {
   if (!storm) return "El satélite no ve nubes de tormenta en la región.";
-  return [`${prefix} a ${Math.round(storm.km)} km al ${storm.direction}.`, trendText(trend)].filter(Boolean).join(" ");
+  return [`${prefix}: ${Math.round(storm.km)} km al ${storm.direction}.`, trendText(trend)].filter(Boolean).join(" ");
 }
 
 function PlaceSummary(props: {
@@ -320,9 +327,9 @@ function PlaceSummary(props: {
     context = trendText(trend);
     tone = status.level === "severe" ? "text-severe" : "text-convective";
   } else if (state === "healthy") {
-    title = `Sin actividad detectada a menos de ${AROUND_KM} km`;
+    title = `Sin actividad a menos de ${AROUND_KM} km`;
     advice = "Revisamos el satélite cada 10 minutos.";
-    context = storm ? stormLine(storm, trend, "Las nubes de tormenta más cercanas están") : null;
+    context = storm ? stormLine(storm, trend, "Nubes de tormenta más cercanas") : null;
     tone = "text-quiet";
   } else {
     title = "No podemos confirmar el estado";

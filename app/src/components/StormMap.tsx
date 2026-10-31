@@ -3,7 +3,7 @@
 import maplibregl, { type GeoJSONSource } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { useEffect, useRef, useSyncExternalStore } from "react";
-import { NEAR_KM, circleRing } from "@/lib/geo";
+import { NEAR_KM, circleRing, nearestStorm } from "@/lib/geo";
 import type { Status } from "@/lib/status";
 import type { Place } from "./StatusProvider";
 
@@ -79,6 +79,9 @@ function supportsWebGL(): boolean {
 }
 
 const never = () => () => {};
+
+/** Storms farther than this from the viewer are not worth zooming the map out for. */
+const STORM_FRAME_KM = 150;
 
 export default function StormMap(props: Props) {
   const webgl = useSyncExternalStore(never, supportsWebGL, () => true);
@@ -210,8 +213,21 @@ function LiveMap({ status, place, onPick, summaryId }: Props) {
     me.current.setLngLat([p.lon, p.lat]);
     (m.getSource("me-ring") as GeoJSONSource).setData(collection([ring(p.lat, p.lon, NEAR_KM)]));
     if (p.source === "gps") {
-      const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-      m.easeTo({ center: [p.lon, p.lat], zoom: Math.max(m.getZoom(), 9), duration: reduceMotion ? 0 : 800 });
+      const duration = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 800;
+      const status = latest.current.status;
+      const storm = status && nearestStorm(status, p.lat, p.lon);
+      if (storm && storm.km <= STORM_FRAME_KM) {
+        // Frame the viewer and the closest storm together, clear of the banner and the sheet.
+        m.fitBounds(
+          [
+            [Math.min(p.lon, storm.lon), Math.min(p.lat, storm.lat)],
+            [Math.max(p.lon, storm.lon), Math.max(p.lat, storm.lat)],
+          ],
+          { padding: { top: 200, bottom: 200, left: 40, right: 40 }, maxZoom: 10, duration },
+        );
+      } else {
+        m.easeTo({ center: [p.lon, p.lat], zoom: Math.max(m.getZoom(), 9), duration });
+      }
     }
   }
 
