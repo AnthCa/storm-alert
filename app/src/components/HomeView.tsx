@@ -81,6 +81,8 @@ export function HomeView() {
         />
       </div>
 
+      {/* Keeps whatever floats on top readable over any part of the map. */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-bg/85 via-bg/40 to-transparent" />
       <div
         id="map-top-overlay"
         className="pointer-events-none absolute inset-x-0 top-0 flex flex-col gap-2.5 px-4 pt-[max(1rem,env(safe-area-inset-top))]"
