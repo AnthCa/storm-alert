@@ -32,6 +32,8 @@ const StormMap = dynamic(() => import("./StormMap"), {
 export function HomeView() {
   const { status, error, demo, online, place, setPlace, clearPlace, locate } = useStatus();
   const [locateMessage, setLocateMessage] = useState<string | null>(null);
+  // The map comes first: the sheet stays short unless the viewer asks for details.
+  const [expanded, setExpanded] = useState(false);
   const now = useNow();
   // Before hydration (now = 0) data counts as current; the clock corrects it a moment later.
   const state = dataState(status, { demo, online, now: now ? new Date(now) : undefined });
@@ -68,7 +70,7 @@ export function HomeView() {
 
       <section
         id="storm-summary"
-        className="absolute inset-x-0 bottom-18 z-10 flex flex-col gap-3.5 rounded-t-[22px] border-t border-line bg-surface px-4 pt-2.5 pb-4"
+        className="absolute inset-x-0 bottom-18 z-10 flex flex-col gap-2.5 rounded-t-[22px] border-t border-line bg-surface px-4 pt-1 pb-3"
         aria-label="Actividad en tu ubicación"
         aria-live="polite"
       >
@@ -80,7 +82,16 @@ export function HomeView() {
         >
           <LocateIcon />
         </button>
-        <div className="h-1 w-10 self-center rounded-full bg-[#3a424d]" aria-hidden="true" />
+        <button
+          type="button"
+          onClick={() => setExpanded(!expanded)}
+          aria-expanded={expanded}
+          aria-controls="storm-details"
+          aria-label={expanded ? "Ocultar detalles" : "Ver detalles"}
+          className="flex min-h-6 w-full items-center justify-center"
+        >
+          <span className="h-1 w-10 rounded-full bg-[#3a424d]" aria-hidden="true" />
+        </button>
         {place && activity && status ? (
           <PlaceSummary
             activity={activity}
@@ -88,20 +99,22 @@ export function HomeView() {
             state={state}
             place={place}
             town={nearestTown(place.lat, place.lon)}
+            detailed={expanded}
             onClear={clearPlace}
           />
         ) : (
-          <div className="flex flex-col gap-2">
-            <h2 className="text-2xl font-bold tracking-tight">¿Dónde estás?</h2>
-            <p className="text-sm text-soft">Te mostramos qué tan cerca está la actividad observada.</p>
+          <div className="flex items-center gap-3">
+            <div className="flex grow flex-col gap-0.5">
+              <h2 className="text-lg font-bold tracking-tight">¿Dónde estás?</h2>
+              <p className="text-[13px] text-soft">Usa tu ubicación o toca el mapa.</p>
+            </div>
             <button
               type="button"
               onClick={handleLocate}
-              className="mt-1 flex min-h-12 items-center justify-center gap-2 rounded-xl bg-accent font-semibold text-white"
+              className="flex min-h-11 shrink-0 items-center gap-2 rounded-xl bg-accent px-3.5 text-sm font-semibold text-white"
             >
-              <LocateIcon size={20} /> Usar mi ubicación
+              <LocateIcon size={18} /> Ubicarme
             </button>
-            <p className="text-center text-[13px] text-muted">o toca el mapa para marcarla</p>
           </div>
         )}
         {locateMessage && (
@@ -109,9 +122,25 @@ export function HomeView() {
             {locateMessage}
           </p>
         )}
-        {status && <Stats status={status} activity={activity} current={state === "healthy" || state === "degraded"} />}
-        <Legend />
-        {status && state === "healthy" && <ShareStatus status={status} />}
+        {expanded && (
+          <div id="storm-details" className="flex flex-col gap-3">
+            {status && (
+              <Stats status={status} activity={activity} current={state === "healthy" || state === "degraded"} />
+            )}
+            <Legend />
+            {status && state === "healthy" && <ShareStatus status={status} />}
+          </div>
+        )}
+        <button
+          type="button"
+          onClick={() => setExpanded(!expanded)}
+          aria-expanded={expanded}
+          aria-controls="storm-details"
+          className="flex min-h-9 items-center justify-center gap-1 text-[13px] font-semibold text-quiet"
+        >
+          {expanded ? "Ocultar detalles" : "Ver detalles"}
+          <ChevronRightIcon size={14} className={expanded ? "-rotate-90" : "rotate-90"} />
+        </button>
       </section>
     </main>
   );
@@ -252,9 +281,11 @@ function PlaceSummary(props: {
   state: DataState;
   place: { lat: number; lon: number };
   town: string | null;
+  /** The long outside-area explanation only shows with the details open. */
+  detailed: boolean;
   onClear: () => void;
 }) {
-  const { activity, status, state, place, town, onClear } = props;
+  const { activity, status, state, place, town, detailed, onClear } = props;
   const { level, nearest } = activity;
   const current = state === "healthy" || state === "degraded";
   const storm = nearestStorm(status, place.lat, place.lon);
@@ -300,19 +331,19 @@ function PlaceSummary(props: {
   }
 
   return (
-    <div className="flex flex-col gap-1">
-      <div className="flex items-center justify-between gap-2">
+    <div className="flex flex-col gap-0.5">
+      <div className="-my-2 flex items-center justify-between gap-2">
         <div className="flex items-center gap-1.5 text-[13px] text-muted">
           <PinIcon size={14} className="text-quiet" />
           Tu ubicación{town ? ` · ${town}` : ""}
         </div>
-        <button type="button" onClick={onClear} className="min-h-11 px-1 text-[13px] text-quiet">
-          Borrar ubicación
+        <button type="button" onClick={onClear} aria-label="Borrar ubicación" className="min-h-11 px-1 text-[13px] text-quiet">
+          Borrar
         </button>
       </div>
-      <h2 className={`text-2xl font-bold tracking-tight ${tone}`}>{title}</h2>
+      <h2 className={`text-xl font-bold tracking-tight ${tone}`}>{title}</h2>
       <p className="text-sm text-soft">{advice}</p>
-      {context && current && <p className="text-[13px] text-soft">{context}</p>}
+      {context && current && (detailed || level !== "outside") && <p className="text-[13px] text-soft">{context}</p>}
       {!current && (level !== "outside" || observed) && (
         <p className="text-[13px] text-muted">Según datos de las {localTime(status.data_until_utc)}.</p>
       )}
