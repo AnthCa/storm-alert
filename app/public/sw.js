@@ -1,5 +1,6 @@
-// Miranubes service worker: lets the installed app open offline with the last data it saw.
-const CACHE = "storm-alert-v3";
+// Miranubes service worker: lets the installed app open offline with the last data it saw,
+// and shows the pilot push notifications sent by the pipeline (research/.../push.py).
+const CACHE = "storm-alert-v4";
 const SHELL = ["/", "/observacion", "/oficiales", "/notificaciones", "/como-funciona", "/privacidad", "/demo/requinoa-2026-10-26.json"];
 
 self.addEventListener("install", (event) => {
@@ -51,4 +52,35 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(cacheFirst(request));
   }
   // Everything else (map tiles, fonts) goes straight to the network.
+});
+
+// Payload: {title, body, tag, url}. One tag per kind, so a newer notice replaces an older one.
+self.addEventListener("push", (event) => {
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch {
+    data = { body: event.data ? event.data.text() : "" };
+  }
+  event.waitUntil(
+    self.registration.showNotification(data.title || "Miranubes", {
+      body: data.body || "",
+      tag: data.tag || "miranubes",
+      renotify: true,
+      icon: "/icons/icon-192.png",
+      data: { url: data.url || "/" },
+    }),
+  );
+});
+
+// Tapping a notification opens the app, or focuses it if it is already open.
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const url = new URL(event.notification.data?.url || "/", self.location.origin).href;
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((windows) => {
+      const open = windows.find((client) => new URL(client.url).origin === self.location.origin);
+      return open ? open.focus() : self.clients.openWindow(url);
+    }),
+  );
 });

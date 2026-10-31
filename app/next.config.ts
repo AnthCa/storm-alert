@@ -3,6 +3,8 @@ import type { NextConfig } from "next";
 const isDev = process.env.NODE_ENV !== "production";
 const STATUS_ORIGIN = "https://anthca.github.io";
 const MAP_ORIGIN = "https://tiles.openfreemap.org";
+// The push pilot subscribes through Supabase; empty when the pilot is not configured.
+const PUSH_ORIGIN = process.env.NEXT_PUBLIC_SUPABASE_URL ? new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).origin : "";
 
 // CSP without nonces keeps every page static (fast, no serverless cost on the free plan).
 // Accepted risk: 'unsafe-inline' scripts. The app renders no user-generated content.
@@ -13,7 +15,7 @@ const csp = [
   "style-src 'self' 'unsafe-inline'",
   `img-src 'self' data: blob: ${MAP_ORIGIN}`,
   "font-src 'self'",
-  `connect-src 'self' ${STATUS_ORIGIN} ${MAP_ORIGIN}`,
+  `connect-src 'self' ${STATUS_ORIGIN} ${MAP_ORIGIN} ${PUSH_ORIGIN}`.trim(),
   "worker-src 'self' blob:",
   "child-src blob:",
   "manifest-src 'self'",

@@ -375,3 +375,12 @@ describe("cloud image", () => {
     expect(paintClouds([], DEFAULT_BBOX)).toMatchObject({ width: 600, height: 400 });
   });
 });
+
+describe("push keys", () => {
+  it("decodes the base64url VAPID public key to a 65-byte uncompressed point", async () => {
+    const { VAPID_PUBLIC_KEY, base64UrlToBytes } = await import("./push");
+    const bytes = base64UrlToBytes(VAPID_PUBLIC_KEY);
+    expect(bytes.length).toBe(65);
+    expect(bytes[0]).toBe(4);
+  });
+});

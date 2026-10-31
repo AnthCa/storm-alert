@@ -10,7 +10,7 @@ const SECTIONS = [
   },
   {
     title: "Dónde se guarda y con qué precisión",
-    body: "En este dispositivo (almacenamiento del navegador), redondeada a unos 1 km. No la enviamos a ningún servidor de Miranubes. Los cálculos se hacen en tu teléfono o computador.",
+    body: "En este dispositivo (almacenamiento del navegador), redondeada a unos 1 km. Los cálculos se hacen en tu teléfono o computador. Solo si activas las notificaciones del piloto enviamos ese punto aproximado a nuestra base de datos (ver «Notificaciones»).",
   },
   {
     title: "Cuánto tiempo se conserva",
@@ -22,17 +22,17 @@ const SECTIONS = [
   },
   {
     title: "Notificaciones",
-    body: "Aún no enviamos notificaciones. Cuando existan, serán voluntarias, guardarán solo una ubicación aproximada o tu comuna, y podrás borrar tu suscripción en cualquier momento. Esta página se actualizará antes de activarlas.",
+    body: "Son voluntarias y, por ahora, solo para personas invitadas a un piloto. Si las activas guardamos en nuestra base de datos (Supabase, región São Paulo) tu punto aproximado (~1 km), el radio que elegiste, la dirección técnica de notificación de tu navegador y la hora de los últimos avisos enviados, para no repetirlos. Los avisos se envían a través del servicio de notificaciones de tu navegador (Google, Apple o Mozilla). Al tocar «Desactivar» se borra tu suscripción.",
   },
   {
     title: "Lo que no hacemos",
-    body: "No usamos tu ubicación para analítica ni publicidad, no tenemos cuentas de usuario y no vendemos datos.",
+    body: "No usamos tu ubicación para analítica ni publicidad, no tenemos cuentas de usuario y no vendemos datos. No guardamos un historial de lugares: si cambias tu punto, se reemplaza el anterior.",
   },
 ];
 
 export default function PrivacyPage() {
   return (
-    <PageShell title="Privacidad" intro="Última actualización: 30 de octubre de 2026.">
+    <PageShell title="Privacidad" intro="Última actualización: 31 de octubre de 2026.">
       {SECTIONS.map((section) => (
         <section key={section.title} className="flex flex-col gap-1.5">
           <h2 className="text-lg font-semibold">{section.title}</h2>
