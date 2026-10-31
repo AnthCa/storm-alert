@@ -13,7 +13,7 @@ import {
   stormEta,
   stormTrend,
 } from "./geo";
-import { DEFAULT_BBOX, GRID_DEG, paintClouds } from "./cloud-image";
+import { DEFAULT_BBOX, GRID_DEG, cloudColor, paintClouds } from "./cloud-image";
 import { replayFrames } from "./replay";
 import { shareMessage } from "./share";
 import { dataState, normalizeStatus, type Status } from "./status";
@@ -335,8 +335,8 @@ describe("cloud image", () => {
     const img = paintClouds([[-34.3, -70.8, -40]], box);
     expect([img.width, img.height]).toEqual([40, 40]);
     const centre = at(img, -34.3, -70.8);
-    expect(centre.slice(0, 3)).toEqual([242, 165, 58]); // premultiplied blur keeps the colour
-    expect(centre[3]).toBeGreaterThan(80); // a lone pixel stays faint, as it should
+    expect(centre.slice(0, 3)).toEqual(cloudColor(-40).slice(0, 3)); // premultiplied blur keeps the colour
+    expect(centre[3]).toBeGreaterThan(50); // a lone pixel stays faint, as it should
     const edge = at(img, -34.3, -70.775);
     expect(edge[3]).toBeGreaterThan(0);
     expect(edge[3]).toBeLessThan(centre[3]);
@@ -348,7 +348,7 @@ describe("cloud image", () => {
       [-70.82, -70.8, -70.78].map((lon) => [lat, lon, -40] as [number, number, number]),
     );
     const img = paintClouds(rows, box);
-    for (const lat of [-34.29, -34.308]) expect(at(img, lat, -70.8)[3]).toBeGreaterThan(150);
+    for (const lat of [-34.29, -34.308]) expect(at(img, lat, -70.8)[3]).toBeGreaterThan(120);
   });
 
   it("keeps the colder pixel where two overlap", () => {
@@ -362,6 +362,13 @@ describe("cloud image", () => {
     const [r, g] = at(img, -34.3, -70.8);
     expect(r).toBeLessThan(215); // the cold core dominates the blend
     expect(g).toBeLessThan(90);
+  });
+
+  it("ramps colour and opacity continuously with temperature", () => {
+    expect(cloudColor(-38)).toEqual([245, 170, 60, 175]);
+    expect(cloudColor(-30)).toEqual([245, 170, 60, 175]);
+    expect(cloudColor(-47)).toEqual([225, 73, 56, 210]);
+    expect(cloudColor(-70)).toEqual([210, 70, 210, 235]);
   });
 
   it("covers the pipeline's mapped area by default", () => {

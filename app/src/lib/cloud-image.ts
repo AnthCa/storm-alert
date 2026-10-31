@@ -11,7 +11,6 @@ const PIXEL_KM = 3;
 const BLUR_RADIUS = 2;
 const BLUR_PASSES = 3;
 const KM_PER_DEG_LAT = 111.2;
-const ALPHA = 225;
 
 /** Mapped area when status.json does not say (schema < 3); matches the pipeline's BBOX. */
 export const DEFAULT_BBOX: Bbox = {
@@ -21,11 +20,33 @@ export const DEFAULT_BBOX: Bbox = {
   lon_max: -69.5,
 };
 
-/** Same steps as the legend: −38 to −44 °C, −44 to −50 °C, below −50 °C. */
-export function cloudColor(tempC: number): [number, number, number] {
-  if (tempC < -50) return [194, 38, 27];
-  if (tempC < -44) return [240, 100, 79];
-  return [242, 165, 58];
+/**
+ * Continuous colour ramp by cloud-top temperature, as in enhanced infrared imagery:
+ * orange at the −38 °C storm threshold, red, dark red, then magenta for the coldest
+ * overshooting tops. Warmer tops are also more transparent, so the core stands out.
+ */
+export const CLOUD_RAMP: [number, [number, number, number], number][] = [
+  [-38, [245, 170, 60], 175],
+  [-44, [244, 105, 80], 200],
+  [-50, [205, 40, 32], 220],
+  [-56, [150, 20, 70], 230],
+  [-62, [210, 70, 210], 235],
+];
+
+export function cloudColor(tempC: number): [number, number, number, number] {
+  const ramp = CLOUD_RAMP;
+  if (tempC >= ramp[0][0]) return [...ramp[0][1], ramp[0][2]];
+  for (let i = 1; i < ramp.length; i++) {
+    const [t1, c1, a1] = ramp[i];
+    if (tempC >= t1) {
+      const [t0, c0, a0] = ramp[i - 1];
+      const f = (t0 - tempC) / (t0 - t1);
+      const mix = (x: number, y: number) => Math.round(x + (y - x) * f);
+      return [mix(c0[0], c1[0]), mix(c0[1], c1[1]), mix(c0[2], c1[2]), mix(a0, a1)];
+    }
+  }
+  const last = ramp[ramp.length - 1];
+  return [...last[1], last[2]];
 }
 
 export interface CloudImage {
@@ -53,7 +74,7 @@ export function paintClouds(
     const halfX = halfY / Math.cos((lat * Math.PI) / 180);
     const cx = (lon - box.lon_min) / GRID_DEG;
     const cy = (box.lat_max - lat) / GRID_DEG;
-    const [r, g, b] = cloudColor(tempC);
+    const [r, g, b, alpha] = cloudColor(tempC);
     for (
       let y = Math.max(0, Math.round(cy - halfY));
       y < Math.min(height, Math.round(cy + halfY));
@@ -68,7 +89,7 @@ export function paintClouds(
         data[i] = r;
         data[i + 1] = g;
         data[i + 2] = b;
-        data[i + 3] = ALPHA;
+        data[i + 3] = alpha;
       }
     }
   }

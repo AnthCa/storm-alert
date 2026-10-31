@@ -330,9 +330,10 @@ function LiveMap({ status, place, onPick, summaryId, replay }: Props) {
         type: "circle",
         source: "flashes",
         paint: {
-          "circle-radius": ["interpolate", ["linear"], ["zoom"], 7, 3.5, 11, 8],
+          // Faint glows that add up: where flashes crowd, the area brightens as a density.
+          "circle-radius": ["interpolate", ["linear"], ["zoom"], 7, 3, 11, 7],
           "circle-color": "#FFE14D",
-          "circle-opacity": 0.2,
+          "circle-opacity": 0.12,
           "circle-blur": 1,
         },
       });
@@ -342,10 +343,9 @@ function LiveMap({ status, place, onPick, summaryId, replay }: Props) {
         source: "flashes",
         paint: {
           // Small bright dots: hundreds of rings hid the storm under them.
-          "circle-radius": ["interpolate", ["linear"], ["zoom"], 7, 1.3, 11, 2.6],
-          "circle-color": "#FFF3A6",
-          "circle-stroke-color": "#FFD21F",
-          "circle-stroke-width": 0.6,
+          "circle-radius": ["interpolate", ["linear"], ["zoom"], 7, 0.9, 11, 1.8],
+          "circle-color": "#FFF6C2",
+          "circle-opacity": 0.8,
         },
       });
       m.addLayer({

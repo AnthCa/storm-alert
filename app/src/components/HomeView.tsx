@@ -19,6 +19,7 @@ import {
   type StormNearby,
   type Trend,
 } from "@/lib/geo";
+import { CLOUD_RAMP } from "@/lib/cloud-image";
 import { replayFrames, type ReplayFrame } from "@/lib/replay";
 import { ago, dataState, formatC, localTime, type DataState, type Status } from "@/lib/status";
 import { BoltFilledIcon, ChevronRightIcon, CloudIcon, InfoIcon, LocateIcon, PinIcon, PlayIcon, WarningIcon } from "./Icons";
@@ -155,7 +156,8 @@ export function HomeView() {
         {expanded && (
           <div id="storm-details" className="flex flex-col gap-3">
             <p className="text-[13px] text-soft">
-              Colores de las nubes: más fría = más alta = tormenta más intensa. Datos de nubes de las{" "}
+              Colores de las nubes: más fría = más alta = tormenta más intensa. Naranja desde −38 °C (nube de
+              tormenta), rojo desde −44 °C, rojo oscuro bajo −50 °C y magenta en los topes más fríos. Datos de nubes de las{" "}
               {status ? localTime(status.latest_scan_utc) : "—"} y de rayos hasta las{" "}
               {status ? localTime(status.data_until_utc) : "—"}.
             </p>
@@ -532,24 +534,20 @@ function Stat({ label, value, note, highlight }: { label: string; value: string;
   );
 }
 
+const CLOUD_GRADIENT = `linear-gradient(to right, ${CLOUD_RAMP.map(([, [r, g, b], a]) => `rgba(${r},${g},${b},${a / 255})`).join(", ")})`;
+
 /** Always visible: the colours are the map's main message, so they need words next to them. */
 function Legend() {
-  const items = [
-    { label: "−38° tormenta", className: "bg-convective" },
-    { label: "−44° fuerte", className: "bg-[#f0644f]" },
-    { label: "−50° muy fuerte", className: "bg-[#c2261b]" },
-    { label: "Rayo", className: "size-1.5! bg-[#FFF3A6] shadow-[0_0_6px_2px_rgba(255,225,77,0.5)]" },
-  ];
   return (
-    <div className="flex flex-col gap-1">
-      <ul className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-soft" aria-label="Leyenda del mapa">
-        {items.map((item) => (
-          <li key={item.label} className="flex items-center gap-1.5">
-            <span className={`size-2.5 rounded-full ${item.className}`} aria-hidden="true" />
-            {item.label}
-          </li>
-        ))}
-      </ul>
+    <div className="flex items-center gap-2 text-xs text-soft" aria-label="Leyenda: nubes de −38 a −62 grados, más frías más intensas; puntos amarillos, rayos">
+      <span className="shrink-0">Nubes</span>
+      <span className="font-mono text-muted">−38°</span>
+      <span className="h-2 min-w-12 grow rounded-full" style={{ background: CLOUD_GRADIENT }} aria-hidden="true" />
+      <span className="font-mono text-muted">−62°</span>
+      <span className="ml-2 flex shrink-0 items-center gap-1.5">
+        <span className="size-1.5 rounded-full bg-[#FFF6C2] shadow-[0_0_6px_2px_rgba(255,225,77,0.5)]" aria-hidden="true" />
+        Rayo
+      </span>
     </div>
   );
 }
