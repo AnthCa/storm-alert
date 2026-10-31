@@ -2,7 +2,7 @@
 
 import maplibregl, { type GeoJSONSource } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useSyncExternalStore } from "react";
 import { NEAR_KM, circleRing } from "@/lib/geo";
 import type { Status } from "@/lib/status";
 import type { Place } from "./StatusProvider";
@@ -63,7 +63,36 @@ interface Props {
   summaryId: string;
 }
 
-export default function StormMap({ status, place, onPick, summaryId }: Props) {
+let webglSupport: boolean | null = null;
+
+/** Old phones, or browsers with hardware acceleration off, have no WebGL and cannot draw the map. */
+function supportsWebGL(): boolean {
+  if (webglSupport === null) {
+    try {
+      const canvas = document.createElement("canvas");
+      webglSupport = !!(canvas.getContext("webgl2") ?? canvas.getContext("webgl"));
+    } catch {
+      webglSupport = false;
+    }
+  }
+  return webglSupport;
+}
+
+const never = () => () => {};
+
+export default function StormMap(props: Props) {
+  const webgl = useSyncExternalStore(never, supportsWebGL, () => true);
+  if (!webgl) {
+    return (
+      <div className="flex size-full items-center justify-center px-8 pb-40 text-center text-sm text-soft" role="note">
+        Este dispositivo no puede mostrar el mapa. El estado y las distancias de abajo siguen funcionando.
+      </div>
+    );
+  }
+  return <LiveMap {...props} />;
+}
+
+function LiveMap({ status, place, onPick, summaryId }: Props) {
   const container = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
   const me = useRef<maplibregl.Marker | null>(null);
@@ -73,15 +102,21 @@ export default function StormMap({ status, place, onPick, summaryId }: Props) {
 
   useEffect(() => {
     if (!container.current) return;
-    const m = new maplibregl.Map({
-      container: container.current,
-      style: STYLE_URL,
-      center: REQUINOA,
-      zoom: 8.4,
-      minZoom: 6,
-      maxZoom: 12,
-      attributionControl: { compact: true },
-    });
+    let m: maplibregl.Map;
+    try {
+      m = new maplibregl.Map({
+        container: container.current,
+        style: STYLE_URL,
+        center: REQUINOA,
+        zoom: 8.4,
+        minZoom: 6,
+        maxZoom: 12,
+        attributionControl: { compact: true },
+      });
+    } catch {
+      // A map that fails to start must not take the status and distances down with it.
+      return;
+    }
     map.current = m;
 
     m.on("load", () => {
