@@ -11,6 +11,14 @@ import type { Place } from "./StatusProvider";
 
 // Free vector tiles, no API key (https://openfreemap.org).
 const STYLE_URL = "https://tiles.openfreemap.org/styles/dark";
+// Free elevation tiles, no API key (AWS Open Data, Mapzen terrarium encoding). Shaded
+// relief makes the Andes readable, so people can tell valley storms from mountain ones.
+// Points along the Andes east of O'Higgins where the range is named on the map.
+const ANDES_LABEL: [number, number][] = [
+  [-34.1, -70.05],
+  [-34.95, -70.3],
+];
+const RELIEF_URL = "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png";
 const REQUINOA: [number, number] = [-70.82, -34.29];
 
 type Feature = GeoJSON.Feature<GeoJSON.Geometry, Record<string, number | string>>;
@@ -265,6 +273,66 @@ function LiveMap({ status, place, onPick, summaryId, replay }: Props) {
 
     m.on("load", () => {
       const data = stormData(latest.current.status, latest.current.replay);
+      m.addSource("relief", {
+        type: "raster-dem",
+        tiles: [RELIEF_URL],
+        encoding: "terrarium",
+        tileSize: 256,
+        maxzoom: 11,
+        attribution: "Relieve: Mapzen, AWS Terrain Tiles",
+      });
+      // Right above the background, under roads, places and the storm layers: it orients, it
+      // must not compete with the clouds.
+      m.addLayer(
+        {
+          id: "relief",
+          type: "hillshade",
+          source: "relief",
+          paint: {
+            "hillshade-exaggeration": 0.5,
+            "hillshade-shadow-color": "rgba(0, 0, 0, 0.6)",
+            "hillshade-highlight-color": "rgba(170, 195, 230, 0.14)",
+            "hillshade-accent-color": "rgba(0, 0, 0, 0)",
+          },
+        },
+        m.getStyle().layers.find((layer) => layer.type !== "background")?.id,
+      );
+      // Height tint: the valley stays dark and the Andes brighten as they rise, so the range
+      // reads at a glance (the coastal hills, under ~2000 m, stay faint).
+      m.addLayer(
+        {
+          id: "relief-tint",
+          type: "color-relief",
+          source: "relief",
+          paint: {
+            "color-relief-color": [
+              "interpolate",
+              ["linear"],
+              ["elevation"],
+              0, "rgba(120, 145, 185, 0)",
+              1400, "rgba(120, 145, 185, 0)",
+              2400, "rgba(120, 145, 185, 0.2)",
+              3600, "rgba(145, 170, 210, 0.34)",
+              5000, "rgba(175, 200, 235, 0.45)",
+            ],
+          },
+        },
+        "relief",
+      );
+      m.addSource("range-label", { type: "geojson", data: collection(ANDES_LABEL.map(([lat, lon]) => point(lat, lon))) });
+      m.addLayer({
+        id: "range-label",
+        type: "symbol",
+        source: "range-label",
+        layout: {
+          "text-field": "CORDILLERA DE LOS ANDES",
+          "text-font": ["Noto Sans Regular"],
+          "text-size": 12,
+          "text-letter-spacing": 0.25,
+          "text-rotate": -80,
+        },
+        paint: { "text-color": "rgba(185, 205, 235, 0.8)", "text-halo-color": "rgba(0, 0, 0, 0.6)", "text-halo-width": 1 },
+      });
       m.addSource("outside", { type: "geojson", data: data.outside });
       m.addSource("area", { type: "geojson", data: data.area });
       m.addSource("observed", { type: "geojson", data: data.observed });

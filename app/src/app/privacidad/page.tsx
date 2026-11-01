@@ -18,7 +18,7 @@ const SECTIONS = [
   },
   {
     title: "Qué terceros reciben solicitudes técnicas",
-    body: "Al cargar el mapa, tu navegador pide las imágenes del mapa a OpenFreeMap y los datos meteorológicos a GitHub Pages, y la app se sirve desde Vercel. Como en cualquier sitio web, esos servicios reciben tu dirección IP y qué partes del mapa se pidieron. No les enviamos tu ubicación guardada.",
+    body: "Al cargar el mapa, tu navegador pide las imágenes del mapa a OpenFreeMap, el relieve a Amazon Web Services y los datos meteorológicos a GitHub Pages, y la app se sirve desde Vercel. Como en cualquier sitio web, esos servicios reciben tu dirección IP y qué partes del mapa se pidieron. No les enviamos tu ubicación guardada.",
   },
   {
     title: "Estadísticas de visitas",
