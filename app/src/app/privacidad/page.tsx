@@ -21,12 +21,16 @@ const SECTIONS = [
     body: "Al cargar el mapa, tu navegador pide las imágenes del mapa a OpenFreeMap y los datos meteorológicos a GitHub Pages, y la app se sirve desde Vercel. Como en cualquier sitio web, esos servicios reciben tu dirección IP y qué partes del mapa se pidieron. No les enviamos tu ubicación guardada.",
   },
   {
+    title: "Estadísticas de visitas",
+    body: "Contamos visitas con Vercel Web Analytics, que no usa cookies ni identifica a las personas: registra la página vista, el país y el tipo de dispositivo y navegador. No incluye tu ubicación guardada.",
+  },
+  {
     title: "Notificaciones",
     body: "Son voluntarias y, por ahora, solo para personas invitadas a un piloto. Si las activas guardamos en nuestra base de datos (Supabase, región São Paulo) tu punto aproximado (~1 km), el radio que elegiste, la dirección técnica de notificación de tu navegador y la hora de los últimos avisos enviados, para no repetirlos. Los avisos se envían a través del servicio de notificaciones de tu navegador (Google, Apple o Mozilla). Al tocar «Desactivar» se borra tu suscripción.",
   },
   {
     title: "Lo que no hacemos",
-    body: "No usamos tu ubicación para analítica ni publicidad, no tenemos cuentas de usuario y no vendemos datos. No guardamos un historial de lugares: si cambias tu punto, se reemplaza el anterior.",
+    body: "No usamos tu ubicación para estadísticas ni publicidad, no tenemos cuentas de usuario y no vendemos datos. No guardamos un historial de lugares: si cambias tu punto, se reemplaza el anterior.",
   },
 ];
 

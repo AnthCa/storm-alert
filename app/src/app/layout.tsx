@@ -1,3 +1,4 @@
+import { Analytics } from "@vercel/analytics/next";
 import type { Metadata, Viewport } from "next";
 import { IBM_Plex_Mono, IBM_Plex_Sans, Space_Grotesk } from "next/font/google";
 import { BottomNav } from "@/components/BottomNav";
@@ -50,6 +51,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           <TitleBadge />
         </StatusProvider>
         <ServiceWorker />
+        {/* Cookieless page-view counts; no location or personal data. */}
+        <Analytics />
       </body>
     </html>
   );
