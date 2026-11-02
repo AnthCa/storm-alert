@@ -150,9 +150,11 @@ export function AlertsSettings() {
               <span>MIRANUBES</span>
               <span>ahora</span>
             </div>
-            <div className="text-[15px] font-semibold">Nubes de tormenta a 12 km al sur de Casa de mis papás</div>
+            <div className="text-[15px] font-semibold">
+              Nubes de tormenta con rayos a 12 km al sur de Casa de mis papás
+            </div>
             <div className="text-sm text-[#2e353d]">
-              Dentro de tus 25 km, con topes de hasta −45 °C. Observación experimental, no es un aviso oficial.
+              Hubo rayos dentro de tus 25 km en la última media hora. Observación experimental, no es un aviso oficial.
             </div>
           </div>
         </div>
@@ -169,8 +171,8 @@ export function AlertsSettings() {
             minutos.
           </li>
           <li>
-            <strong className="text-fg">Nubes de tormenta dentro de tu radio</strong>: como máximo una vez por hora y
-            lugar.
+            <strong className="text-fg">Nubes muy frías dentro de tu radio</strong>: como máximo una vez por hora y
+            lugar. Solo las llamamos tormenta si hay rayos; sin rayos pueden ser solo nubes altas o lluvia.
           </li>
         </ul>
         <p className="text-[13px] text-muted">

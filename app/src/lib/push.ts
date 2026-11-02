@@ -137,7 +137,7 @@ export async function testNotification() {
     return;
   }
   for (const [slot, name] of names.entries()) {
-    await registration.showNotification(`Prueba: nubes de tormenta a 12 km al sur de ${name}`, {
+    await registration.showNotification(`Prueba: nubes muy frías a 12 km al sur de ${name}`, {
       body,
       icon: "/icons/icon-192.png",
       tag: `test-${slot}`,

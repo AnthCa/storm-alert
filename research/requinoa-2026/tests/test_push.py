@@ -36,8 +36,16 @@ def test_quiet_sends_nothing():
 def test_storm_within_radius():
     notification = choose(RANCAGUA, status(cold_pixels=COLD_SOUTH), NOW)
     assert notification.kind == "storm"
-    assert notification.title == "Nubes de tormenta a 12 km al sur"
+    assert notification.title == "Nubes muy frías a 12 km al sur"
+    assert "Sin rayos por ahora" in notification.body
     assert "no es un aviso oficial" in notification.body
+
+
+def test_storm_is_called_a_storm_only_with_lightning_in_the_radius():
+    old_flash = [[-34.3, -70.74, 25.0]]  # ~14 km south, 25 min ago: too old for a lightning notice
+    notification = choose(RANCAGUA, status(cold_pixels=COLD_SOUTH, flash_cells_30min=old_flash), NOW)
+    assert notification.kind == "storm"
+    assert notification.title == "Nubes de tormenta con rayos a 12 km al sur"
 
 
 def test_one_or_two_flickering_pixels_are_not_a_storm():
@@ -102,7 +110,7 @@ def test_distant_places_each_get_their_notice():
     cold_parents = [[-34.62, -70.99, -44.0], [-34.62, -70.98, -41.0], [-34.63, -70.99, -40.0]]
     planned = plan([HOME, PARENTS], status(cold_pixels=COLD_SOUTH + cold_parents), NOW)
     assert [(p["slot"], send) for p, _, send in planned] == [(0, True), (2, True)]
-    assert planned[1][1].title.startswith("Nubes de tormenta a 4 km")
+    assert planned[1][1].title.startswith("Nubes muy frías a 4 km")
 
 
 def test_severe_goes_once_per_phone_without_a_place():

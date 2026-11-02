@@ -9,7 +9,8 @@ at most one notification per run, by priority:
 1. severe:    the alert area turned severe (once per episode), for testers whose
               radius reaches the alert circle.
 2. lightning: a flash within LIGHTNING_KM in the last 10 minutes (every 30 min at most).
-3. storm:     cold tops within the tester's radius (every 60 min at most).
+3. storm:     cold tops within the tester's radius (every 60 min at most); called a
+              storm only when lightning fell within that radius in the last 30 min.
 
 Places closer than NEARBY_PLACES_KM to one already notified in the same run share its
 notice, and the severe notice goes once per phone. Notifications carry the place's slot;
@@ -109,11 +110,20 @@ def choose(sub: dict, status: dict, now: datetime) -> Notification | None:
     within = [p for p in cold if float(distance_km(lat, lon, p[0], p[1])) <= radius]
     if len(within) >= STORM_MIN_PIXELS and _due(last, "storm", now):
         km, (s_lat, s_lon, _) = _nearest(lat, lon, within)
-        coldest = min(p[2] for p in within)
+        where = f"a {round(km)} km al {direction(lat, lon, s_lat, s_lon)}"
+        # Cold tops alone are often a grey sky of high cloud: say "storm" only with lightning.
+        flashes = status.get("flash_cells_30min", [])
+        if any(float(distance_km(lat, lon, f[0], f[1])) <= radius for f in flashes):
+            return Notification(
+                "storm",
+                f"Nubes de tormenta con rayos {where}",
+                f"Hubo rayos dentro de tus {radius} km en la última media hora. {note}",
+            )
         return Notification(
             "storm",
-            f"Nubes de tormenta a {round(km)} km al {direction(lat, lon, s_lat, s_lon)}",
-            f"Dentro de tus {radius} km, con topes de hasta {round(coldest)} °C. {note}",
+            f"Nubes muy frías {where}",
+            f"Sin rayos por ahora: pueden ser solo nubes altas o traer lluvia. Si cae un rayo a menos de "
+            f"{LIGHTNING_KM} km te avisamos. {note}",
         )
     return None
 
