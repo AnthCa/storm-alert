@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useState, useSyncExternalStore } from "react";
 import { useStoredValue } from "@/lib/browser-store";
@@ -33,6 +34,9 @@ import { useStatus } from "./StatusProvider";
 
 const PUSH_KEY = "miranubes:push";
 
+// MapLibre is heavy: load the picker only when someone opens it.
+const PlacePicker = dynamic(() => import("./PlacePicker"), { ssr: false });
+
 const RADIUS_HINT: Record<PushRadius, string> = {
   10: "Solo tormentas casi encima. Menos avisos.",
   25: "Recomendado: tiempo suficiente para prepararte.",
@@ -64,6 +68,7 @@ export function AlertsSettings() {
   const [message, setMessage] = useState<string | null>(null);
   // A phone the server no longer knows (for example after clearing its data) needs the code again.
   const [needCode, setNeedCode] = useState(false);
+  const [picking, setPicking] = useState<number | null>(null);
 
   const active = stored !== null;
   const showForm = support === "ok" && (!active || editing);
@@ -305,13 +310,24 @@ export function AlertsSettings() {
                     <option value="here">
                       {here ? `Punto marcado en el mapa (${nearestTown(here.lat, here.lon, 15) ?? "sin comuna"})` : "Punto marcado en el mapa (no hay)"}
                     </option>
-                    {row.kept && <option value="kept">Punto guardado ({nearestTown(row.kept.lat, row.kept.lon, 15) ?? "sin comuna"})</option>}
+                    {row.kept && (
+                      <option value="kept">
+                        Punto elegido en el mapa ({nearestTown(row.kept.lat, row.kept.lon, 15) ?? "sin comuna"})
+                      </option>
+                    )}
                     {TOWNS.map(([town]) => (
                       <option key={town} value={town}>
                         {town}
                       </option>
                     ))}
                   </select>
+                  <button
+                    type="button"
+                    onClick={() => setPicking(index)}
+                    className="min-h-11 rounded-xl border border-quiet-line bg-quiet-bg text-[15px] font-semibold text-quiet"
+                  >
+                    {row.where === "kept" ? "Ajustar en el mapa" : "Elegir el punto exacto en el mapa"}
+                  </button>
                   {missing && (
                     <p className="text-[13px] text-severe">
                       No hay un punto marcado.{" "}
@@ -378,6 +394,16 @@ export function AlertsSettings() {
           >
             {busy ? "Guardando…" : active ? "Guardar lugares" : "Activar notificaciones"}
           </button>
+          {picking !== null && (
+            <PlacePicker
+              initial={draftPoint(rows[picking], here)}
+              onCancel={() => setPicking(null)}
+              onPick={(point) => {
+                updateRow(picking, { where: "kept", kept: point });
+                setPicking(null);
+              }}
+            />
+          )}
           {editing && (
             <button
               type="button"
