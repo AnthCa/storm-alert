@@ -1,10 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { DemoLink } from "@/components/DemoLink";
-import { BoltIcon, CloudIcon, CodeIcon } from "@/components/Icons";
+import { BoltIcon, CloudIcon, CodeIcon, ExternalIcon } from "@/components/Icons";
 import { Card, Note, PageShell } from "@/components/PageShell";
 
 export const metadata: Metadata = { title: "Cómo funciona · Miranubes" };
+
+// Mercado Pago link without a set amount: each person chooses how much to give.
+const DONATE_URL = "https://link.mercadopago.cl/miranubes";
 
 const LEVELS = [
   { name: "Tranquilo", dot: "bg-[#6cb8ff]", tone: "text-quiet", text: "No hay nubes de tormenta ni rayos cerca." },
@@ -159,6 +162,23 @@ export default function HowItWorksPage() {
         rango y todavía no está validado. No reemplaza los avisos
         oficiales de SENAPRED ni de la Dirección Meteorológica.
       </Note>
+
+      <Card>
+        <h2 className="text-[17px] font-semibold">Apoya el proyecto</h2>
+        <p className="text-sm leading-relaxed text-soft">
+          Miranubes es gratis y lo hace una sola persona en O&apos;Higgins. Si te sirve, puedes invitarme un café: tú
+          eliges el monto. Es voluntario y no cambia nada de lo que ves en la app.
+        </p>
+        <a
+          href={DONATE_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex min-h-12 items-center justify-center gap-2 rounded-xl border border-line bg-bg text-[15px] font-semibold"
+        >
+          Invítame un café <ExternalIcon size={18} className="text-quiet" />
+        </a>
+        <p className="text-[13px] text-muted">Se paga en Mercado Pago. No recibimos tus datos de pago.</p>
+      </Card>
 
       <footer className="flex flex-col gap-2 text-[13px] text-muted">
         <p>Datos: NOAA GOES-19 (ABI y GLM), públicos y gratuitos. Mapa: OpenFreeMap y OpenStreetMap.</p>
