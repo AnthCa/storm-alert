@@ -185,6 +185,9 @@ export default function HowItWorksPage() {
         <Link href="/instalar" className="flex min-h-11 items-center text-sm text-quiet">
           Instalar la app en tu teléfono
         </Link>
+        <Link href="/patrocinar" className="flex min-h-11 items-center text-sm text-quiet">
+          Patrocinar Miranubes
+        </Link>
         <Link href="/privacidad" className="flex min-h-11 items-center text-sm text-quiet">
           Política de privacidad
         </Link>
