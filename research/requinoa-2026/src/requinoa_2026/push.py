@@ -1,14 +1,19 @@
-"""Web Push pilot: notify invited testers about storms near their place.
+"""Web Push pilot: notify invited testers about storms near their places.
 
 Runs after each realtime cycle (see .github/workflows/storm-map.yml) when the
-repository variable PUSH_ENABLED is "true". Reads the status.json just written,
-the active subscriptions from Supabase (infra/supabase/push_pilot.sql) and sends
-at most one notification per tester per run, by priority:
+repository variable PUSH_ENABLED is "true". Reads the status.json just written and
+the places of every active subscription from Supabase (infra/supabase/push_places.sql:
+up to three per phone, such as home, a school and the parents' house). Each place gets
+at most one notification per run, by priority:
 
 1. severe:    the alert area turned severe (once per episode), for testers whose
               radius reaches the alert circle.
 2. lightning: a flash within LIGHTNING_KM in the last 10 minutes (every 30 min at most).
 3. storm:     cold tops within the tester's radius (every 60 min at most).
+
+Places closer than NEARBY_PLACES_KM to one already notified in the same run share its
+notice, and the severe notice goes once per phone. Notifications carry the place's slot;
+the phone adds the name it was given, which never reaches the server (app/public/sw.js).
 
 Everything is an experimental observation, never an official warning, and the
 messages say so. Nothing is sent when the data is stale or unavailable.
@@ -19,6 +24,7 @@ import math
 import os
 import sys
 import urllib.request
+from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
@@ -32,6 +38,8 @@ LIGHTNING_RECENT_MIN = 10
 STORM_MIN_PIXELS = 3
 COOLDOWN = {"severe": None, "lightning": timedelta(minutes=30), "storm": timedelta(minutes=60)}
 STALE_AFTER = timedelta(minutes=25)
+# Home and a school 3 km apart see the same storm: one notice is enough.
+NEARBY_PLACES_KM = 10
 APP_URL = "https://miranubes.vercel.app/"
 CHILE = ZoneInfo("America/Santiago")
 DIRECTIONS = ["norte", "noreste", "este", "sureste", "sur", "suroeste", "oeste", "noroeste"]
@@ -110,6 +118,35 @@ def choose(sub: dict, status: dict, now: datetime) -> Notification | None:
     return None
 
 
+def plan(places: list[dict], status: dict, now: datetime) -> list[tuple[dict, Notification, bool]]:
+    """(place, notification, send) for one phone's places, in slot order.
+
+    A notification that is not sent is still marked, so the place waits its cooldown
+    instead of repeating the notice its neighbour just gave.
+    """
+    planned, sent = [], []
+    for place in places:
+        notification = choose(place, status, now)
+        if notification is None:
+            continue
+        lat, lon = float(place["lat"]), float(place["lon"])
+        repeated = any(
+            kind == notification.kind
+            and (kind == "severe" or float(distance_km(lat, lon, s_lat, s_lon)) < NEARBY_PLACES_KM)
+            for kind, s_lat, s_lon in sent
+        )
+        if not repeated:
+            sent.append((notification.kind, lat, lon))
+        planned.append((place, notification, not repeated))
+    return planned
+
+
+def payload(place: dict, notification: Notification) -> dict:
+    # The severe notice is about the alert area, not about one of the places.
+    slot = None if notification.kind == "severe" else place.get("slot")
+    return {"title": notification.title, "body": notification.body, "tag": notification.kind, "url": APP_URL, "place": slot}
+
+
 def mark(last: dict, notification: Notification, status: dict, now: datetime) -> dict:
     updated = {**last, notification.kind: now.isoformat()}
     if notification.kind == "severe":
@@ -144,31 +181,34 @@ def main() -> None:
     status = json.loads((OUT_DIR / "status.json").read_text())
     now = datetime.now(timezone.utc)
 
-    subs = _rpc("sender_list", {"token": token}) or []
+    rows = _rpc("sender_places", {"token": token}) or []
+    phones = defaultdict(list)
+    for row in rows:
+        phones[row["subscription_id"]].append(row)
     sent = 0
-    for sub in subs:
-        notification = choose(sub, status, now)
-        if notification is None:
-            continue
-        payload = {"title": notification.title, "body": notification.body, "tag": notification.kind, "url": APP_URL}
-        try:
-            webpush(
-                subscription_info={"endpoint": sub["endpoint"], "keys": {"p256dh": sub["p256dh"], "auth": sub["auth"]}},
-                data=json.dumps(payload, ensure_ascii=False),
-                vapid_private_key=vapid,
-                vapid_claims={"sub": APP_URL.rstrip("/")},
-                ttl=900,
-                headers={"Urgency": "high"},
-            )
-        except WebPushException as error:
-            code = error.response.status_code if error.response is not None else None
-            if code in (404, 410):
-                _rpc("sender_deactivate", {"token": token, "sub_id": sub["id"]})
-            print(f"push: subscription {sub['id']} failed ({code})", file=sys.stderr)
-            continue
-        _rpc("sender_mark", {"token": token, "sub_id": sub["id"], "notified": mark(sub.get("last_notified") or {}, notification, status, now)})
-        sent += 1
-    print(f"push: {sent} sent to {len(subs)} subscriptions")
+    for sub_id, places in phones.items():
+        for place, notification, send in plan(places, status, now):
+            if send:
+                try:
+                    webpush(
+                        subscription_info={"endpoint": place["endpoint"], "keys": {"p256dh": place["p256dh"], "auth": place["auth"]}},
+                        data=json.dumps(payload(place, notification), ensure_ascii=False),
+                        vapid_private_key=vapid,
+                        vapid_claims={"sub": APP_URL.rstrip("/")},
+                        ttl=900,
+                        headers={"Urgency": "high"},
+                    )
+                except WebPushException as error:
+                    code = error.response.status_code if error.response is not None else None
+                    print(f"push: subscription {sub_id} failed ({code})", file=sys.stderr)
+                    if code in (404, 410):
+                        _rpc("sender_deactivate", {"token": token, "sub_id": sub_id})
+                        break  # the phone is gone: skip its other places
+                    continue
+                sent += 1
+            notified = mark(place.get("last_notified") or {}, notification, status, now)
+            _rpc("sender_mark_place", {"token": token, "place_id": place["place_id"], "notified": notified})
+    print(f"push: {sent} sent for {len(rows)} places on {len(phones)} phones")
 
 
 if __name__ == "__main__":

@@ -1,7 +1,7 @@
 /**
  * Web Push pilot (invited testers only). The browser subscribes with the VAPID public key
- * and the subscription goes to Supabase through pilot_subscribe, which checks the pilot
- * code (infra/supabase/push_pilot.sql). The pipeline sends the notifications.
+ * and the subscription goes to Supabase through pilot_set_places, which checks the pilot
+ * code (infra/supabase/push_places.sql). The pipeline sends the notifications.
  */
 
 /** Public half of the VAPID pair; the private half is a GitHub Actions secret. */
@@ -14,6 +14,22 @@ const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
 
 export const PUSH_RADII = [10, 25, 50] as const;
 export type PushRadius = (typeof PUSH_RADII)[number];
+
+/** Places per phone: home, a school, the parents' house. The database allows up to 3. */
+export const MAX_PLACES = 3;
+export const PLACE_NAME_MAX = 30;
+
+/** A place to watch. The name stays on this phone; the server gets the point and radius. */
+export interface PushPlace {
+  name: string;
+  lat: number;
+  lon: number;
+  radius: PushRadius;
+}
+
+// Read by the service worker (public/sw.js) to name the place in each notification.
+const PLACES_CACHE = "miranubes-places";
+const PLACES_URL = "/__places.json";
 
 /**
  * ok: can subscribe here. install: an iPhone browser tab; iOS only delivers web push to
@@ -56,31 +72,46 @@ async function rpc(name: string, body: Record<string, unknown>): Promise<void> {
   }
 }
 
-export async function subscribe(options: { code: string; lat: number; lon: number; radius: PushRadius }) {
+async function storePlaceNames(names: string[] | null) {
+  const cache = await caches.open(PLACES_CACHE);
+  if (names) await cache.put(PLACES_URL, Response.json(names));
+  else await cache.delete(PLACES_URL);
+}
+
+/**
+ * Subscribes this browser if needed and replaces its list of places. A browser that is
+ * already subscribed does not need the pilot code again.
+ */
+export async function savePlaces(options: { code: string; places: PushPlace[] }) {
   const permission = await Notification.requestPermission();
   if (permission !== "granted") throw new Error("denied");
   const registration = await navigator.serviceWorker.ready;
+  const existing = await registration.pushManager.getSubscription();
+  const wasSubscribed = existing !== null;
   const subscription =
-    (await registration.pushManager.getSubscription()) ??
+    existing ??
     (await registration.pushManager.subscribe({
       userVisibleOnly: true,
       applicationServerKey: base64UrlToBytes(VAPID_PUBLIC_KEY),
     }));
   const keys = subscription.toJSON().keys ?? {};
   try {
-    await rpc("pilot_subscribe", {
+    await rpc("pilot_set_places", {
       code: options.code.trim().toUpperCase(),
       endpoint: subscription.endpoint,
       p256dh: keys.p256dh,
       auth: keys.auth,
-      lat: options.lat,
-      lon: options.lon,
-      radius_km: options.radius,
+      places: options.places.map(({ lat, lon, radius }) => ({ lat, lon, radius_km: radius })),
     });
   } catch (error) {
-    await subscription.unsubscribe();
+    if (!wasSubscribed) await subscription.unsubscribe();
     throw error;
   }
+  await storePlaceNames(options.places.map((place) => placeName(place.name)));
+}
+
+export function placeName(name: string): string {
+  return name.trim().replace(/\s+/g, " ").slice(0, PLACE_NAME_MAX);
 }
 
 export async function unsubscribe() {
@@ -89,6 +120,7 @@ export async function unsubscribe() {
   if (!subscription) return;
   await rpc("pilot_unsubscribe", { endpoint: subscription.endpoint }).catch(() => undefined);
   await subscription.unsubscribe();
+  await storePlaceNames(null).catch(() => undefined);
 }
 
 /** A local notification, to check that this device shows them. Nothing leaves the phone. */

@@ -254,7 +254,7 @@ export function coarsen(value: number): number {
 }
 
 /** Main towns of O'Higgins, to name the area around a point. Approximate centres. */
-const TOWNS: [string, number, number][] = [
+export const TOWNS: [string, number, number][] = [
   ["Rancagua", -34.17, -70.74],
   ["Machalí", -34.18, -70.65],
   ["Graneros", -34.07, -70.73],

@@ -1,6 +1,10 @@
 // Miranubes service worker: lets the installed app open offline with the last data it saw,
 // and shows the pilot push notifications sent by the pipeline (research/.../push.py).
 const CACHE = "storm-alert-v4";
+// Names of the notification places, written by the app (src/lib/push.ts). They stay on
+// this phone: the server only knows each place's slot.
+const PLACES_CACHE = "miranubes-places";
+const PLACES_URL = "/__places.json";
 const SHELL = ["/", "/observacion", "/oficiales", "/notificaciones", "/como-funciona", "/privacidad", "/demo/requinoa-2026-10-26.json"];
 
 self.addEventListener("install", (event) => {
@@ -12,7 +16,7 @@ self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches
       .keys()
-      .then((keys) => Promise.all(keys.filter((key) => key !== CACHE).map((key) => caches.delete(key))))
+      .then((keys) => Promise.all(keys.filter((key) => key !== CACHE && key !== PLACES_CACHE).map((key) => caches.delete(key))))
       .then(() => self.clients.claim()),
   );
 });
@@ -54,7 +58,33 @@ self.addEventListener("fetch", (event) => {
   // Everything else (map tiles, fonts) goes straight to the network.
 });
 
-// Payload: {title, body, tag, url}. One tag per kind, so a newer notice replaces an older one.
+async function placeName(slot) {
+  if (typeof slot !== "number") return null;
+  try {
+    const response = await (await caches.open(PLACES_CACHE)).match(PLACES_URL);
+    const names = response ? await response.json() : [];
+    return typeof names[slot] === "string" && names[slot].trim() ? names[slot].trim() : null;
+  } catch {
+    return null;
+  }
+}
+
+// Payload: {title, body, tag, url, place}. One tag per kind and place, so a newer notice
+// replaces an older one about the same place. Titles read "… a 8 km al sur", so the
+// place's name completes them: "… a 8 km al sur de Casa de mis papás".
+async function showPush(data) {
+  const name = await placeName(data.place);
+  const title = data.title || "Miranubes";
+  const tag = (data.tag || "miranubes") + (typeof data.place === "number" ? `-${data.place}` : "");
+  return self.registration.showNotification(name ? `${title} de ${name}` : title, {
+    body: data.body || "",
+    tag,
+    renotify: true,
+    icon: "/icons/icon-192.png",
+    data: { url: data.url || "/" },
+  });
+}
+
 self.addEventListener("push", (event) => {
   let data = {};
   try {
@@ -62,15 +92,7 @@ self.addEventListener("push", (event) => {
   } catch {
     data = { body: event.data ? event.data.text() : "" };
   }
-  event.waitUntil(
-    self.registration.showNotification(data.title || "Miranubes", {
-      body: data.body || "",
-      tag: data.tag || "miranubes",
-      renotify: true,
-      icon: "/icons/icon-192.png",
-      data: { url: data.url || "/" },
-    }),
-  );
+  event.waitUntil(showPush(data));
 });
 
 // Tapping a notification opens the app, or focuses it if it is already open.

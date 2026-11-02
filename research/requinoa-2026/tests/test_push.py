@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
 
-from requinoa_2026.push import choose, direction, mark
+from requinoa_2026.push import choose, direction, mark, payload, plan
 
 NOW = datetime(2026, 10, 26, 20, 32, tzinfo=timezone.utc)
 RANCAGUA = {"id": 1, "lat": -34.17, "lon": -70.74, "radius_km": 25, "last_notified": {}}
@@ -85,3 +85,39 @@ def test_severe_skips_testers_far_from_the_alert_area():
 def test_stale_or_unavailable_data_sends_nothing():
     assert choose(RANCAGUA, status(cold_pixels=COLD_SOUTH), NOW + timedelta(minutes=40)) is None
     assert choose(RANCAGUA, status(cold_pixels=COLD_SOUTH, health={"state": "unavailable"}), NOW) is None
+
+
+# A phone's places as sender_places returns them.
+HOME = {**RANCAGUA, "place_id": 10, "slot": 0}
+SCHOOL = {**RANCAGUA, "place_id": 11, "slot": 1, "lat": -34.19, "lon": -70.76}  # ~3 km from home
+PARENTS = {**RANCAGUA, "place_id": 12, "slot": 2, "lat": -34.58, "lon": -70.99, "radius_km": 10}
+
+
+def test_nearby_places_share_one_notice():
+    planned = plan([HOME, SCHOOL], status(cold_pixels=COLD_SOUTH), NOW)
+    assert [(p["slot"], n.kind, send) for p, n, send in planned] == [(0, "storm", True), (1, "storm", False)]
+
+
+def test_distant_places_each_get_their_notice():
+    cold_parents = [[-34.62, -70.99, -44.0], [-34.62, -70.98, -41.0], [-34.63, -70.99, -40.0]]
+    planned = plan([HOME, PARENTS], status(cold_pixels=COLD_SOUTH + cold_parents), NOW)
+    assert [(p["slot"], send) for p, _, send in planned] == [(0, True), (2, True)]
+    assert planned[1][1].title.startswith("Nubes de tormenta a 4 km")
+
+
+def test_severe_goes_once_per_phone_without_a_place():
+    severe = status(level="severe", episode_start_utc="2026-10-26T19:40:00+00:00")
+    planned = plan([HOME, PARENTS], severe, NOW)
+    assert [send for _, _, send in planned] == [True, False]
+    assert payload(HOME, planned[0][1])["place"] is None
+
+
+def test_payload_names_the_place_by_slot_only():
+    notification = choose(SCHOOL, status(cold_pixels=COLD_SOUTH), NOW)
+    assert payload(SCHOOL, notification) == {
+        "title": notification.title,
+        "body": notification.body,
+        "tag": "storm",
+        "url": "https://miranubes.vercel.app/",
+        "place": 1,
+    }

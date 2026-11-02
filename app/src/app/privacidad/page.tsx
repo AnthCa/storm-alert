@@ -10,7 +10,7 @@ const SECTIONS = [
   },
   {
     title: "Dónde se guarda y con qué precisión",
-    body: "En este dispositivo (almacenamiento del navegador), redondeada a unos 1 km. Los cálculos se hacen en tu teléfono o computador. Solo si activas las notificaciones del piloto enviamos ese punto aproximado a nuestra base de datos (ver «Notificaciones»).",
+    body: "En este dispositivo (almacenamiento del navegador), redondeada a unos 1 km. Los cálculos se hacen en tu teléfono o computador. Solo si activas las notificaciones del piloto enviamos puntos aproximados a nuestra base de datos (ver «Notificaciones»).",
   },
   {
     title: "Cuánto tiempo se conserva",
@@ -26,7 +26,7 @@ const SECTIONS = [
   },
   {
     title: "Notificaciones",
-    body: "Son voluntarias y, por ahora, solo para personas invitadas a un piloto. Si las activas guardamos en nuestra base de datos (Supabase, región São Paulo) tu punto aproximado (~1 km), el radio que elegiste, la dirección técnica de notificación de tu navegador y la hora de los últimos avisos enviados, para no repetirlos. Los avisos se envían a través del servicio de notificaciones de tu navegador (Google, Apple o Mozilla). Al tocar «Desactivar» se borra tu suscripción.",
+    body: "Son voluntarias y, por ahora, solo para personas invitadas a un piloto. Si las activas guardamos en nuestra base de datos (Supabase, región São Paulo) el punto aproximado (~1 km) de cada lugar que elijas (hasta 3), el radio, la dirección técnica de notificación de tu navegador y la hora de los últimos avisos enviados, para no repetirlos. Los nombres que les pones a tus lugares (por ejemplo, «Casa de mis papás») quedan solo en tu teléfono: nunca los recibimos. Los avisos se envían a través del servicio de notificaciones de tu navegador (Google, Apple o Mozilla). Al tocar «Desactivar» se borra tu suscripción.",
   },
   {
     title: "Lo que no hacemos",
