@@ -169,6 +169,14 @@ export function lastFlashNear(status: Status, lat: number, lon: number): LastFla
   };
 }
 
+/**
+ * Whether any flash fell within `km` in the last 30 minutes. Cold tops alone are often
+ * just high cloud, so the app only speaks of lightning or a storm when this is true.
+ */
+export function lightningWithin(status: Status, lat: number, lon: number, km: number): boolean {
+  return status.flash_cells_30min.some(([pLat, pLon]) => distanceKm(lat, lon, pLat, pLon) <= km);
+}
+
 /** Arrival estimates only for storms between these distances; farther, the error is too large. */
 export const ETA_MIN_KM = NEAR_KM;
 export const ETA_MAX_KM = 150;

@@ -7,6 +7,7 @@ import {
   distanceKm,
   insideObservedArea,
   lastFlashNear,
+  lightningWithin,
   nearestStorm,
   nearestTown,
   etaText,
@@ -382,5 +383,14 @@ describe("push keys", () => {
     const bytes = base64UrlToBytes(VAPID_PUBLIC_KEY);
     expect(bytes.length).toBe(65);
     expect(bytes[0]).toBe(4);
+  });
+});
+
+describe("lightning nearby", () => {
+  it("is true only for flashes of the last 30 minutes within the distance", () => {
+    const s = status({ flash_cells_30min: [[-34.35, -70.74, 12]] }); // ~20 km south of Rancagua
+    expect(lightningWithin(s, -34.17, -70.74, 25)).toBe(true);
+    expect(lightningWithin(s, -34.17, -70.74, 10)).toBe(false);
+    expect(lightningWithin(status(), -34.17, -70.74, 25)).toBe(false);
   });
 });

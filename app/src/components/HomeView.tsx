@@ -11,6 +11,7 @@ import {
   etaText,
   insideObservedArea,
   lastFlashNear,
+  lightningWithin,
   nearestStorm,
   nearestTown,
   stormEta,
@@ -434,16 +435,23 @@ function PlaceSummary(props: {
     title = "Fuera del área monitoreada";
     advice = `Por ahora solo observamos la zona de O'Higgins y alertamos ${status.radius_km} km alrededor de Requínoa. Revisa los avisos oficiales para tu zona.`;
     tone = "text-soft";
-  } else if (level === "over") {
+  } else if (level === "over" && activity.flashesNear > 0) {
     title = "Actividad sobre tu zona";
     advice = "Hay rayos muy cerca. Entra a un lugar cerrado.";
     tone = "text-severe";
-  } else if (level === "near" && nearest) {
+  } else if ((level === "over" || level === "near") && nearest && !lightningWithin(status, place.lat, place.lon, AROUND_KM)) {
+    // Cold tops without a single flash nearby: often just a grey sky of high cloud.
+    title = level === "over" ? "Nubes muy frías sobre tu zona" : `Nubes muy frías a ${Math.round(nearest.km)} km al ${nearest.direction}`;
+    advice = ["Sin rayos por ahora: pueden ser solo nubes altas o traer lluvia.", level === "near" ? movement : null]
+      .filter(Boolean)
+      .join(" ");
+    tone = "text-convective";
+  } else if ((level === "over" || level === "near") && nearest) {
     title = `Actividad a ${Math.round(nearest.km)} km al ${nearest.direction}`;
     advice =
       status.level === "severe"
         ? "Se está intensificando. Si estás al aire libre, busca refugio."
-        : (movement ?? "Mantente atento por si se acerca.");
+        : (movement ?? "Hubo rayos en la última media hora. Mantente atento por si se acerca.");
     tone = status.level === "severe" ? "text-severe" : "text-convective";
   } else if (state === "healthy" && flash) {
     // No flash in the last 10 minutes, but one within the safety distance in the last 30.
