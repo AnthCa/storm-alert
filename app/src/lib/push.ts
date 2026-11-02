@@ -123,12 +123,24 @@ export async function unsubscribe() {
   await storePlaceNames(null).catch(() => undefined);
 }
 
-/** A local notification, to check that this device shows them. Nothing leaves the phone. */
+/**
+ * Local notifications, one per saved place and named as real ones will be, to check that
+ * this device shows them and knows the names. Nothing leaves the phone.
+ */
 export async function testNotification() {
   const registration = await navigator.serviceWorker.ready;
-  await registration.showNotification("Miranubes: prueba", {
-    body: "Así te llegarán los avisos. Observación experimental, no es un aviso oficial.",
-    icon: "/icons/icon-192.png",
-    tag: "test",
-  });
+  const response = await (await caches.open(PLACES_CACHE)).match(PLACES_URL);
+  const names: string[] = response ? await response.json() : [];
+  const body = "Así te llegarán los avisos. Observación experimental, no es un aviso oficial.";
+  if (!names.length) {
+    await registration.showNotification("Miranubes: prueba", { body, icon: "/icons/icon-192.png", tag: "test" });
+    return;
+  }
+  for (const [slot, name] of names.entries()) {
+    await registration.showNotification(`Prueba: nubes de tormenta a 12 km al sur de ${name}`, {
+      body,
+      icon: "/icons/icon-192.png",
+      tag: `test-${slot}`,
+    });
+  }
 }
