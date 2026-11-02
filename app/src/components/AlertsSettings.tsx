@@ -29,6 +29,7 @@ import {
   type Where,
 } from "@/lib/push-places";
 import { LockIcon } from "./Icons";
+import { InstallCard } from "./InstallCard";
 import { LogoMark } from "./Logo";
 import { Note, PageShell } from "./PageShell";
 import { useStatus } from "./StatusProvider";
@@ -181,10 +182,10 @@ export function AlertsSettings() {
       </section>
 
       {support === "install" && (
-        <Note title="Primero instala la app">
-          En iPhone, las notificaciones solo llegan a la app instalada. Toca Compartir y luego &quot;Agregar a
-          inicio&quot;, abre Miranubes desde ese ícono y vuelve a esta pantalla.
-        </Note>
+        <>
+          <InstallCard />
+          <p className="-mt-3 text-[13px] text-muted">Después vuelve a esta pantalla para activar los avisos.</p>
+        </>
       )}
       {(support === "unsupported" || support === "unconfigured") && (
         <Note title="No disponible aquí">

@@ -162,6 +162,9 @@ export default function HowItWorksPage() {
 
       <footer className="flex flex-col gap-2 text-[13px] text-muted">
         <p>Datos: NOAA GOES-19 (ABI y GLM), públicos y gratuitos. Mapa: OpenFreeMap y OpenStreetMap.</p>
+        <Link href="/instalar" className="flex min-h-11 items-center text-sm text-quiet">
+          Instalar la app en tu teléfono
+        </Link>
         <Link href="/privacidad" className="flex min-h-11 items-center text-sm text-quiet">
           Política de privacidad
         </Link>
