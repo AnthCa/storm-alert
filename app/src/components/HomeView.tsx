@@ -284,19 +284,31 @@ function StateBanner(props: {
       </Link>
     );
   }
+  // Cold tops alone are often just high cloud: "storm" only with lightning in the area.
+  const areaLightning = lightningWithin(status, ...status.center, status.radius_km);
   // With a place set, the sheet carries the detail: the banner shrinks to one line.
   if (hasPlace && (status.level === "deep_convection" || status.level === "quiet")) {
     return (
       <CompactBanner
         tone={status.level === "quiet" ? "quiet" : "convective"}
-        title={status.level === "quiet" ? "Área de alerta: sin actividad ahora" : "Área de alerta: nubes de tormenta"}
+        title={
+          status.level === "quiet"
+            ? "Área de alerta: sin actividad ahora"
+            : areaLightning
+              ? "Área de alerta: nubes de tormenta con rayos"
+              : "Área de alerta: nubes muy frías, sin rayos"
+        }
       />
     );
   }
   if (status.level === "deep_convection") {
-    return (
-      <Banner tone="convective" title="Nubes de tormenta en el área monitoreada">
-        Puede haber chubascos y rayos. Sin actividad intensa observada.{partial}
+    return areaLightning ? (
+      <Banner tone="convective" title="Nubes de tormenta con rayos en el área monitoreada">
+        Hubo rayos en la última media hora. Sin actividad intensa observada.{partial}
+      </Banner>
+    ) : (
+      <Banner tone="convective" title="Nubes muy frías en el área monitoreada">
+        Sin rayos por ahora: pueden ser solo nubes altas o traer lluvia. Sin actividad intensa observada.{partial}
       </Banner>
     );
   }
