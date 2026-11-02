@@ -34,12 +34,14 @@ CYCLE_S = 600
 
 SCHEMA_VERSION = 4
 # Bump whenever the alert rule or its thresholds change (see false_alarms.py).
-ALGORITHM_VERSION = "2026.10-r1"
+ALGORITHM_VERSION = "2026.11-r1"
 
 GLM_FILE_S = 20  # one GLM L2 file every 20 s
 ABI_SCAN = pd.Timedelta("10min")  # full disk every 10 min
-# A 5-minute bin with fewer GLM files than this has no flash count, never a zero.
-MIN_BIN_COVERAGE = 14 / 15
+# A 5-minute bin with fewer GLM files than this has no flash count, never a zero. NOAA
+# drops a single 20 s file now and then; two missing (40 s) still leave a usable bin,
+# whose count is scaled up to the full 5 minutes.
+MIN_BIN_COVERAGE = 13 / 15
 # Beyond these delays the newest file is considered late.
 MAX_GLM_DELAY = pd.Timedelta("10min")
 MAX_ABI_DELAY = pd.Timedelta("25min")
@@ -86,7 +88,8 @@ def complete_bins(
     counts = pd.Series(0.0, index=bins)
     if not flashes.empty:
         counts = flash_counts(flashes, radius_km=RADIUS_KM).reindex(bins, fill_value=0).astype(float)
-    return counts.where(bin_coverage(glm_starts, bins) >= MIN_BIN_COVERAGE)
+    coverage = bin_coverage(glm_starts, bins)
+    return (counts / coverage).where(coverage >= MIN_BIN_COVERAGE)
 
 
 def source_health(

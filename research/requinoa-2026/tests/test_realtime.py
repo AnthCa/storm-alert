@@ -51,9 +51,19 @@ def test_partial_bins_are_dropped():
 
 
 def test_bins_with_missing_glm_files_are_unknown_not_zero():
-    files = glm_files("19:00", "19:30", skip=("19:10:00", "19:10:20"))
+    files = glm_files("19:00", "19:30", skip=("19:10:00", "19:10:20", "19:10:40"))
     counts = complete_bins(EMPTY, ts("19:00"), ts("19:30"), files)
     assert counts.isna().tolist() == [False, False, True, False, False, False]
+
+
+def test_two_missing_files_still_count_scaled_to_the_full_bin():
+    files = glm_files("19:00", "19:30", skip=("19:10:00", "19:10:20"))
+    flashes = pd.DataFrame(
+        {"time": pd.to_datetime(["2026-10-26T19:11:00Z"] * 13), "lat": -34.29, "lon": -70.82}
+    )
+    counts = complete_bins(flashes, ts("19:00"), ts("19:30"), files)
+    assert counts.isna().sum() == 0
+    assert counts[ts("19:10")] == 15  # 13 flashes seen in 13 of 15 files
 
 
 def health_for(files: list[pd.Timestamp], abi_count: int = 3) -> dict:
@@ -69,7 +79,7 @@ def test_complete_recent_data_is_healthy():
 
 
 def test_glm_gap_degrades_and_quiet_becomes_unknown():
-    health = health_for(glm_files("19:00", "19:35", skip=("19:20:00", "19:20:20")))
+    health = health_for(glm_files("19:00", "19:35", skip=("19:20:00", "19:20:20", "19:20:40")))
     assert health["state"] == "degraded"
     assert "glm_incomplete" in health["problems"]
     assert public_level("quiet", health) == "unknown"
