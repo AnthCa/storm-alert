@@ -4,7 +4,9 @@ import maplibregl, { type GeoJSONSource } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { useEffect, useRef, useSyncExternalStore } from "react";
 import { NEAR_KM, circleRing, nearestStorm } from "@/lib/geo";
+import { useStoredValue } from "@/lib/browser-store";
 import { DEFAULT_BBOX, paintClouds } from "@/lib/cloud-image";
+import { PUSH_KEY, isLegacy, type LegacyAlerts, type StoredAlerts } from "@/lib/push-places";
 import type { ReplayFrame } from "@/lib/replay";
 import type { Bbox, Status } from "@/lib/status";
 import type { Place } from "./StatusProvider";
@@ -249,8 +251,11 @@ function LiveMap({ status, place, onPick, summaryId, replay }: Props) {
   const userMoved = useRef(false);
   // The status is polled every minute; only a new pipeline run should reframe the map.
   const framedRun = useRef<string | null>(null);
-  const latest = useRef({ status, place, onPick, replay });
-  latest.current = { status, place, onPick, replay };
+  // The places this phone gets notifications for. Drawn here only: names never leave the phone.
+  const [alerts] = useStoredValue<StoredAlerts | LegacyAlerts | null>(PUSH_KEY, null);
+  const saved = alerts && !isLegacy(alerts) ? alerts.places : [];
+  const latest = useRef({ status, place, onPick, replay, saved });
+  latest.current = { status, place, onPick, replay, saved };
 
   useEffect(() => {
     if (!container.current) return;
@@ -340,6 +345,7 @@ function LiveMap({ status, place, onPick, summaryId, replay }: Props) {
       m.addSource("me-ring", { type: "geojson", data: collection([]) });
       m.addSource("me-rings", { type: "geojson", data: collection([]) });
       m.addSource("storm-line", { type: "geojson", data: collection([]) });
+      m.addSource("saved-places", { type: "geojson", data: collection([]) });
 
       m.addLayer({
         id: "outside",
@@ -449,10 +455,37 @@ function LiveMap({ status, place, onPick, summaryId, replay }: Props) {
       m.addLayer({ id: "me-ring-fill", type: "fill", source: "me-ring", paint: { "fill-color": "#6CB8FF", "fill-opacity": 0.05 } });
       m.addLayer({ id: "me-ring-line", type: "line", source: "me-ring", paint: { "line-color": "#6CB8FF", "line-width": 1, "line-opacity": 0.6 } });
 
+      m.addLayer({
+        id: "saved-places",
+        type: "circle",
+        source: "saved-places",
+        paint: {
+          "circle-radius": 5,
+          "circle-color": "#0e1116",
+          "circle-stroke-color": "#6CB8FF",
+          "circle-stroke-width": 2.5,
+        },
+      });
+      m.addLayer({
+        id: "saved-places-label",
+        type: "symbol",
+        source: "saved-places",
+        layout: {
+          "text-field": ["get", "name"],
+          "text-font": LABEL_FONT,
+          "text-size": 12,
+          "text-anchor": "top",
+          "text-offset": [0, 0.7],
+          "text-optional": true,
+        },
+        paint: { "text-color": "#CFE6FF", "text-halo-color": "#0e1116", "text-halo-width": 2 },
+      });
+
       new maplibregl.Marker({ element: markerElement("requinoa-marker") }).setLngLat(REQUINOA).addTo(m);
       ready.current = true;
       syncStorm();
       syncPlace();
+      syncSaved();
     });
 
     m.on("click", (e) => {
@@ -561,8 +594,18 @@ function LiveMap({ status, place, onPick, summaryId, replay }: Props) {
     }
   }
 
+  function syncSaved() {
+    const m = map.current;
+    if (!m || !ready.current) return;
+    const features = latest.current.saved.map((p) => point(p.lat, p.lon, { name: p.name }));
+    (m.getSource("saved-places") as GeoJSONSource).setData(collection(features));
+  }
+
   useEffect(syncStorm, [status, replay]);
   useEffect(syncPlace, [place]);
+  // Keyed by content: `saved` is a new array on every render.
+  const savedKey = JSON.stringify(saved);
+  useEffect(syncSaved, [savedKey]);
 
   // Sized, not positioned: maplibre-gl.css sets `position: relative` on the container and,
   // being unlayered CSS, beats Tailwind's `absolute inset-0`, which left the map 0 px tall.

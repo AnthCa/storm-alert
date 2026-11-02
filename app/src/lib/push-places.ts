@@ -13,6 +13,9 @@ export interface PlaceDraft {
   kept?: { lat: number; lon: number };
 }
 
+/** localStorage key of what this phone remembers about its notifications. */
+export const PUSH_KEY = "miranubes:push";
+
 /** What this phone remembers about its notifications. */
 export interface StoredAlerts {
   places: PushPlace[];

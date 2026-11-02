@@ -18,6 +18,7 @@ import {
   type PushSupport,
 } from "@/lib/push";
 import {
+  PUSH_KEY,
   draftPoint,
   isLegacy,
   toDraft,
@@ -31,8 +32,6 @@ import { LockIcon } from "./Icons";
 import { LogoMark } from "./Logo";
 import { Note, PageShell } from "./PageShell";
 import { useStatus } from "./StatusProvider";
-
-const PUSH_KEY = "miranubes:push";
 
 // MapLibre is heavy: load the picker only when someone opens it.
 const PlacePicker = dynamic(() => import("./PlacePicker"), { ssr: false });
