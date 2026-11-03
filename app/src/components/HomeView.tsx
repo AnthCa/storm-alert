@@ -286,19 +286,20 @@ function StateBanner(props: {
   }
   // Cold tops alone are often just high cloud: "storm" only with lightning in the area.
   const areaLightning = lightningWithin(status, ...status.center, status.radius_km);
+  // Lightning under tops warmer than the cold-cloud threshold: the level stays quiet, but
+  // the area is not "without activity".
+  const warmLightning = status.level === "quiet" && areaLightning && state === "healthy";
   // With a place set, the sheet carries the detail: the banner shrinks to one line.
   if (hasPlace && (status.level === "deep_convection" || status.level === "quiet")) {
+    const title = warmLightning
+      ? "Área de alerta: hay rayos, sin nubes muy frías"
+      : status.level === "quiet"
+        ? "Área de alerta: sin actividad ahora"
+        : areaLightning
+          ? "Área de alerta: nubes de tormenta con rayos"
+          : "Área de alerta: nubes muy frías, sin rayos";
     return (
-      <CompactBanner
-        tone={status.level === "quiet" ? "quiet" : "convective"}
-        title={
-          status.level === "quiet"
-            ? "Área de alerta: sin actividad ahora"
-            : areaLightning
-              ? "Área de alerta: nubes de tormenta con rayos"
-              : "Área de alerta: nubes muy frías, sin rayos"
-        }
-      />
+      <CompactBanner tone={status.level === "quiet" && !warmLightning ? "quiet" : "convective"} title={title} />
     );
   }
   if (status.level === "deep_convection") {
@@ -309,6 +310,13 @@ function StateBanner(props: {
     ) : (
       <Banner tone="convective" title="Nubes muy frías en el área monitoreada">
         Sin rayos por ahora: pueden ser solo nubes altas o traer lluvia. Sin actividad intensa observada.{partial}
+      </Banner>
+    );
+  }
+  if (warmLightning) {
+    return (
+      <Banner tone="convective" title="Rayos en el área monitoreada">
+        Sin nubes muy frías: son tormentas de nubes más bajas. Mantente atento por si se acercan.
       </Banner>
     );
   }
