@@ -5,7 +5,7 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import { useEffect, useRef, useSyncExternalStore } from "react";
 import { NEAR_KM, circleRing, nearestStorm } from "@/lib/geo";
 import { useStoredValue } from "@/lib/browser-store";
-import { DEFAULT_BBOX, paintClouds } from "@/lib/cloud-image";
+import { DEFAULT_BBOX, paintCloudField, paintClouds, type CloudImage } from "@/lib/cloud-image";
 import { PUSH_KEY, isLegacy, type LegacyAlerts, type StoredAlerts } from "@/lib/push-places";
 import type { ReplayFrame } from "@/lib/replay";
 import type { Bbox, Status } from "@/lib/status";
@@ -135,6 +135,8 @@ interface Props {
   summaryId: string;
   /** A replay frame to show instead of the live data, or null. */
   replay: ReplayFrame | null;
+  /** Draw every cloud in grey under the storm colours. */
+  allClouds: boolean;
 }
 
 let webglSupport: boolean | null = null;
@@ -217,7 +219,10 @@ function addColdLayer(m: maplibregl.Map, id: ColdLayer, canvas: HTMLCanvasElemen
 }
 
 function paintCanvas(canvas: HTMLCanvasElement, pixels: [number, number, number][], box: Bbox) {
-  const image = paintClouds(pixels, box);
+  drawImage(canvas, paintClouds(pixels, box));
+}
+
+function drawImage(canvas: HTMLCanvasElement, image: CloudImage) {
   canvas.width = image.width;
   canvas.height = image.height;
   canvas.getContext("2d")!.putImageData(new ImageData(image.data, image.width, image.height), 0, 0);
@@ -238,7 +243,7 @@ export default function StormMap(props: Props) {
   return <LiveMap {...props} />;
 }
 
-function LiveMap({ status, place, onPick, summaryId, replay }: Props) {
+function LiveMap({ status, place, onPick, summaryId, replay, allClouds }: Props) {
   const container = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
   const me = useRef<maplibregl.Marker | null>(null);
@@ -247,6 +252,7 @@ function LiveMap({ status, place, onPick, summaryId, replay }: Props) {
   const coldFront = useRef<ColdLayer>("cold-a");
   const coldCanvas = useRef<Record<ColdLayer, HTMLCanvasElement> | null>(null);
   const coldBox = useRef<Bbox>(DEFAULT_BBOX);
+  const skyCanvas = useRef<HTMLCanvasElement | null>(null);
   // Once the viewer pans or zooms by hand, new data no longer moves the map.
   const userMoved = useRef(false);
   // The status is polled every minute; only a new pipeline run should reframe the map.
@@ -254,8 +260,8 @@ function LiveMap({ status, place, onPick, summaryId, replay }: Props) {
   // The places this phone gets notifications for. Drawn here only: names never leave the phone.
   const [alerts] = useStoredValue<StoredAlerts | LegacyAlerts | null>(PUSH_KEY, null);
   const saved = alerts && !isLegacy(alerts) ? alerts.places : [];
-  const latest = useRef({ status, place, onPick, replay, saved });
-  latest.current = { status, place, onPick, replay, saved };
+  const latest = useRef({ status, place, onPick, replay, saved, allClouds });
+  latest.current = { status, place, onPick, replay, saved, allClouds };
 
   useEffect(() => {
     if (!container.current) return;
@@ -394,6 +400,19 @@ function LiveMap({ status, place, onPick, summaryId, replay }: Props) {
       });
       const box = latest.current.status?.observed_bbox ?? DEFAULT_BBOX;
       coldBox.current = box;
+      // Grey sky first, so the storm colours are drawn over it.
+      skyCanvas.current = document.createElement("canvas");
+      skyCanvas.current.width = skyCanvas.current.height = 1;
+      m.addSource("sky", { type: "canvas", canvas: skyCanvas.current, coordinates: boxCorners(box), animate: false });
+      m.addLayer(
+        {
+          id: "sky",
+          type: "raster",
+          source: "sky",
+          paint: { "raster-opacity": 0, "raster-resampling": "linear", "raster-fade-duration": 0 },
+        },
+        m.getStyle().layers.find((layer) => layer.type === "symbol")?.id,
+      );
       coldCanvas.current = { "cold-a": document.createElement("canvas"), "cold-b": document.createElement("canvas") };
       for (const id of COLD_LAYERS) {
         paintCanvas(coldCanvas.current[id], id === coldFront.current ? data.cold : [], box);
@@ -515,6 +534,7 @@ function LiveMap({ status, place, onPick, summaryId, replay }: Props) {
     (m.getSource("area") as GeoJSONSource).setData(data.area);
     (m.getSource("observed") as GeoJSONSource).setData(data.observed);
     showCold(m, data.cold);
+    showSky(m);
     (m.getSource("flashes") as GeoJSONSource).setData(data.flashes);
     const p = latest.current.place;
     if (p) {
@@ -525,6 +545,20 @@ function LiveMap({ status, place, onPick, summaryId, replay }: Props) {
         frame(m, p);
       }
     }
+  }
+
+  /** The grey layer shows the latest scan only: hidden while replaying or when turned off. */
+  function showSky(m: maplibregl.Map) {
+    const { status, replay, allClouds } = latest.current;
+    const field = status?.cloud_field;
+    const visible = Boolean(field && allClouds && !replay);
+    if (field && skyCanvas.current) {
+      drawImage(skyCanvas.current, paintCloudField(field));
+      const source = m.getSource("sky") as maplibregl.CanvasSource;
+      source.play();
+      m.once("render", () => source.pause());
+    }
+    m.setPaintProperty("sky", "raster-opacity", visible ? 1 : 0);
   }
 
   /** Paints the new clouds on the hidden layer, then fades it in over the visible one. */
@@ -601,7 +635,7 @@ function LiveMap({ status, place, onPick, summaryId, replay }: Props) {
     (m.getSource("saved-places") as GeoJSONSource).setData(collection(features));
   }
 
-  useEffect(syncStorm, [status, replay]);
+  useEffect(syncStorm, [status, replay, allClouds]);
   useEffect(syncPlace, [place]);
   // Keyed by content: `saved` is a new array on every render.
   const savedKey = JSON.stringify(saved);

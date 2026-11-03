@@ -1,4 +1,4 @@
-import type { Bbox } from "./status";
+import type { Bbox, CloudField } from "./status";
 
 /**
  * Image cell size (~0.5 km): fine enough that the blurred edge stays smooth on screen
@@ -156,4 +156,31 @@ function blurAxis(
     }
   }
   return dst;
+}
+
+/** Grey of the all-clouds layer: the sky seen from above, under the storm colours. */
+const SKY_GREY: [number, number, number] = [214, 222, 231];
+/** Tops at or above this are ground or thin low cloud: not drawn. */
+const SKY_CLEAR_C = 5;
+/** Tops at or below this get the full grey; the storm colours take over from −38 °C. */
+const SKY_FULL_C = -35;
+const SKY_MAX_ALPHA = 150;
+
+/** Opacity of the grey layer for a cloud-top temperature: warmer, more see-through. */
+export function skyAlpha(tempC: number): number {
+  const f = (SKY_CLEAR_C - tempC) / (SKY_CLEAR_C - SKY_FULL_C);
+  return Math.round(Math.min(1, Math.max(0, f)) * SKY_MAX_ALPHA);
+}
+
+/** Decodes the pipeline's cloud field into a grey RGBA image; the map smooths it. */
+export function paintCloudField(field: CloudField): CloudImage {
+  const bytes = Uint8Array.from(atob(field.data), (c) => c.charCodeAt(0));
+  const data = new Uint8ClampedArray(field.width * field.height * 4);
+  for (let i = 0; i < field.width * field.height; i++) {
+    data[i * 4] = SKY_GREY[0];
+    data[i * 4 + 1] = SKY_GREY[1];
+    data[i * 4 + 2] = SKY_GREY[2];
+    data[i * 4 + 3] = bytes[i] === 0 ? 0 : skyAlpha(field.warm_c - bytes[i] / field.step);
+  }
+  return { width: field.width, height: field.height, data };
 }

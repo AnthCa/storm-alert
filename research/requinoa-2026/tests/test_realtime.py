@@ -1,9 +1,12 @@
+import base64
+
 import numpy as np
 import pandas as pd
 import xarray as xr
 
 from requinoa_2026.realtime import (
     classify,
+    cloud_field,
     cold_cells,
     cold_history,
     complete_bins,
@@ -148,3 +151,12 @@ def test_flash_cells_keep_the_latest_flash_per_cell_within_thirty_minutes():
 
 def test_no_flashes_no_cells():
     assert latest_flash_cells(EMPTY, data_end=ts("19:30")) == []
+
+
+def test_cloud_field_marks_cold_cloud_and_leaves_warm_ground_empty():
+    box = {"lat_min": -34.4, "lat_max": -34.2, "lon_min": -70.9, "lon_max": -70.7}
+    field = cloud_field(abi_scans([[-40.0, -40.0, 25.0]]).isel(time=0), box, cell_deg=0.05)
+    assert (field["width"], field["height"]) == (4, 4)
+    values = np.frombuffer(base64.b64decode(field["data"]), dtype=np.uint8)
+    assert values.max() == round((20 + 40) * 2.5)
+    assert 0 in values  # cells far from any cloud stay clear

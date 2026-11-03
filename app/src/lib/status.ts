@@ -34,6 +34,18 @@ export interface Bbox {
   lon_max: number;
 }
 
+/** Every cloud top of the latest scan on a regular grid over observed_bbox (schema 5+). */
+export interface CloudField {
+  time_utc: string;
+  width: number;
+  height: number;
+  /** Temperature in C = warm_c - byte / step; byte 0 is ground or warm low cloud. */
+  warm_c: number;
+  step: number;
+  /** Base64 bytes, row 0 at the north edge. */
+  data: string;
+}
+
 export interface Status {
   schema_version: number;
   algorithm_version: string;
@@ -53,6 +65,8 @@ export interface Status {
   cloud_tops: CloudTop[];
   /** [lat, lon, brightness temperature in C], parallax-corrected, latest scan only. */
   cold_pixels: [number, number, number][];
+  /** All clouds for the grey map layer, display only (schema 5+). */
+  cloud_field: CloudField | null;
   /** Thinned cold tops of up to three earlier scans, oldest first (schema 3+). */
   cold_history: ColdScan[];
   /** Area where clouds and flashes are mapped (schema 3+); wider than the alert circle. */
@@ -100,6 +114,7 @@ export function normalizeStatus(raw: Partial<Status> & Pick<Status, "level" | "d
     flashes_per_5min: (raw.flashes_per_5min ?? []).map((b) => ({ ...b, jump: b.jump ?? false })),
     cloud_tops: raw.cloud_tops ?? [],
     cold_pixels: raw.cold_pixels ?? [],
+    cloud_field: raw.cloud_field ?? null,
     cold_history: raw.cold_history ?? [],
     observed_bbox: raw.observed_bbox ?? null,
     recent_flashes: raw.recent_flashes ?? [],

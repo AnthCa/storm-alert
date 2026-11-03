@@ -10,11 +10,13 @@ status.json and a Leaflet map (status.html) to data/realtime/.
 """
 
 import argparse
+import base64
 import json
 import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 
+import numpy as np
 import pandas as pd
 import s3fs
 import xarray as xr
@@ -32,7 +34,7 @@ LOOKBACK = timedelta(minutes=45)
 ALERT_MEMORY = pd.Timedelta("30min")
 CYCLE_S = 600
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 # Bump whenever the alert rule or its thresholds change (see false_alarms.py).
 ALGORITHM_VERSION = "2026.11-r1"
 
@@ -56,6 +58,16 @@ HISTORY_CELL_DEG = 0.02
 # flashes fell. Thinned to ~2 km cells, keeping each cell's most recent flash.
 FLASH_SAFETY_WINDOW = pd.Timedelta("30min")
 FLASH_CELL_DEG = 0.02
+# All clouds of the latest scan, for a grey "sky from above" map layer (display only).
+# ~2.5 km cells over the mapped box; one byte per cell, (CLOUD_FIELD_WARM_C - T) * 2.5,
+# so 0 is ground or cloud at 20 C or warmer and 255 is -82 C.
+CLOUD_FIELD_DEG = 0.025
+CLOUD_FIELD_WARM_C = 20.0
+CLOUD_FIELD_STEP = 2.5
+# Rough cloud-top height from its temperature (standard lapse rate from ~15 C at the
+# ground), for the parallax shift: low cloud moves little, storm tops ~10 km.
+LAPSE_C_PER_KM = 6.5
+SURFACE_C = 15.0
 
 
 def classify(tops: pd.DataFrame, counts: pd.Series, at: pd.Timestamp) -> tuple[str, list[pd.Timestamp]]:
@@ -183,6 +195,39 @@ def cold_history(abi: xr.Dataset, scans: int = HISTORY_SCANS) -> list[dict]:
     ]
 
 
+def cloud_field(scan: xr.Dataset, box: dict = BBOX, cell_deg: float = CLOUD_FIELD_DEG) -> dict:
+    """Every cloud top of one scan on a regular grid over `box`, as a base64 byte image.
+
+    Each pixel is parallax-corrected for a height guessed from its temperature, so low
+    cloud and storm tops both sit over the ground below them. Cells no pixel landed in
+    take the coldest neighbour, which closes the gaps between rows.
+    """
+    bt_c = scan.brightness_temp_k.values - 273.15
+    valid = np.isfinite(bt_c)
+    temps = bt_c[valid]
+    height_m = np.clip((SURFACE_C - temps) / LAPSE_C_PER_KM, 0, 12) * 1000
+    lats, lons = parallax_correct(scan.lat.values[valid], scan.lon.values[valid], height_m)
+    width = round((box["lon_max"] - box["lon_min"]) / cell_deg)
+    height = round((box["lat_max"] - box["lat_min"]) / cell_deg)
+    rows = np.floor((box["lat_max"] - lats) / cell_deg).astype(int)
+    cols = np.floor((lons - box["lon_min"]) / cell_deg).astype(int)
+    inside = (rows >= 0) & (rows < height) & (cols >= 0) & (cols < width)
+    grid = np.full((height, width), np.inf)
+    np.minimum.at(grid, (rows[inside], cols[inside]), temps[inside])
+    padded = np.pad(grid, 1, constant_values=np.inf)
+    neighbours = np.min([padded[1 + dy : 1 + dy + height, 1 + dx : 1 + dx + width] for dy in (-1, 0, 1) for dx in (-1, 0, 1)], axis=0)
+    grid = np.where(np.isinf(grid), neighbours, grid)
+    values = np.where(np.isinf(grid), 0, np.clip((CLOUD_FIELD_WARM_C - grid) * CLOUD_FIELD_STEP, 0, 255))
+    return {
+        "time_utc": pd.Timestamp(scan.time.values).tz_localize("UTC").isoformat(),
+        "width": width,
+        "height": height,
+        "warm_c": CLOUD_FIELD_WARM_C,
+        "step": CLOUD_FIELD_STEP,
+        "data": base64.b64encode(values.round().astype(np.uint8).tobytes()).decode("ascii"),
+    }
+
+
 def latest_flash_cells(
     flashes: pd.DataFrame, data_end: pd.Timestamp, window: pd.Timedelta = FLASH_SAFETY_WINDOW
 ) -> list[list[float]]:
@@ -219,6 +264,7 @@ def map_layers(abi: xr.Dataset, flashes: pd.DataFrame, data_end: pd.Timestamp) -
     recent = flashes[flashes.time >= data_end - pd.Timedelta("10min")]
     return {
         "cold_pixels": cold_pixels,
+        "cloud_field": cloud_field(last),
         "cold_history": cold_history(abi),
         "recent_flashes": recent[["lat", "lon"]].round(3).values.tolist(),
         "flash_cells_30min": latest_flash_cells(flashes, data_end),

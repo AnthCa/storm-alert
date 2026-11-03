@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { useNow } from "@/lib/browser-store";
+import { useNow, useStoredValue } from "@/lib/browser-store";
 import {
   AROUND_KM,
   NEAR_KM,
@@ -23,7 +23,7 @@ import {
 import { CLOUD_RAMP } from "@/lib/cloud-image";
 import { replayFrames, type ReplayFrame } from "@/lib/replay";
 import { ago, dataState, formatC, localTime, type DataState, type Status } from "@/lib/status";
-import { BoltFilledIcon, ChevronRightIcon, CloudIcon, InfoIcon, LocateIcon, PinIcon, PlayIcon, WarningIcon } from "./Icons";
+import { BoltFilledIcon, CheckIcon, ChevronRightIcon, CloudIcon, InfoIcon, LocateIcon, PinIcon, PlayIcon, WarningIcon } from "./Icons";
 import { AppHeader } from "./AppHeader";
 import { DemoBanner } from "./DemoBanner";
 import { ShareStatus } from "./ShareStatus";
@@ -35,6 +35,8 @@ const StormMap = dynamic(() => import("./StormMap"), {
   loading: () => <div className="absolute inset-0 bg-bg" />,
 });
 
+const ALL_CLOUDS_KEY = "miranubes:all-clouds";
+
 export function HomeView() {
   const { status, error, demo, online, place, setPlace, clearPlace, locate } = useStatus();
   const [locateMessage, setLocateMessage] = useState<string | null>(null);
@@ -42,6 +44,8 @@ export function HomeView() {
   const [expanded, setExpanded] = useState(false);
   // Replay of the last scans: the frames are taken when it starts, so new data does not cut it.
   const [replay, setReplay] = useState<{ frames: ReplayFrame[]; index: number } | null>(null);
+  // The grey "sky from above" layer is on unless the viewer turned it off.
+  const [allClouds, setAllClouds] = useStoredValue(ALL_CLOUDS_KEY, true);
 
   useEffect(() => {
     if (!replay) return;
@@ -79,6 +83,7 @@ export function HomeView() {
           onPick={(lat, lon) => setPlace({ lat, lon, source: "map" })}
           summaryId="storm-summary"
           replay={replay ? replay.frames[replay.index] : null}
+          allClouds={allClouds}
         />
       </div>
 
@@ -155,12 +160,12 @@ export function HomeView() {
             {locateMessage}
           </p>
         )}
-        <Legend />
+        <Legend allClouds={allClouds} onToggleClouds={() => setAllClouds(!allClouds)} />
         {expanded && (
           <div id="storm-details" className="flex flex-col gap-3">
             <p className="text-[13px] text-soft">
               Colores de las nubes: más fría = más alta = tormenta más intensa. Naranja desde −38 °C (nube de
-              tormenta), rojo desde −44 °C, rojo oscuro bajo −50 °C y magenta en los topes más fríos. Datos de nubes de las{" "}
+              tormenta), rojo desde −44 °C, rojo oscuro bajo −50 °C y magenta en los topes más fríos. En gris, el resto de las nubes: más blancas mientras más altas. Datos de nubes de las{" "}
               {status ? localTime(status.latest_scan_utc) : "—"} y de rayos hasta las{" "}
               {status ? localTime(status.data_until_utc) : "—"}.
             </p>
@@ -567,17 +572,34 @@ function Stat({ label, value, note, highlight }: { label: string; value: string;
 const CLOUD_GRADIENT = `linear-gradient(to right, ${CLOUD_RAMP.map(([, [r, g, b], a]) => `rgba(${r},${g},${b},${a / 255})`).join(", ")})`;
 
 /** Always visible: the colours are the map's main message, so they need words next to them. */
-function Legend() {
+function Legend({ allClouds, onToggleClouds }: { allClouds: boolean; onToggleClouds: () => void }) {
   return (
-    <div className="flex items-center gap-2 text-xs text-soft" aria-label="Leyenda: nubes de −38 a −62 grados, más frías más intensas; puntos amarillos, rayos">
-      <span className="shrink-0">Nubes</span>
-      <span className="font-mono text-muted">−38°</span>
-      <span className="h-2 min-w-12 grow rounded-full" style={{ background: CLOUD_GRADIENT }} aria-hidden="true" />
-      <span className="font-mono text-muted">−62°</span>
-      <span className="ml-2 flex shrink-0 items-center gap-1.5">
-        <span className="size-1.5 rounded-full bg-[#FFF6C2] shadow-[0_0_6px_2px_rgba(255,225,77,0.5)]" aria-hidden="true" />
-        Rayo
-      </span>
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center gap-2 text-xs text-soft" aria-label="Leyenda: nubes de −38 a −62 grados, más frías más intensas; puntos amarillos, rayos">
+        <span className="shrink-0">Nubes</span>
+        <span className="font-mono text-muted">−38°</span>
+        <span className="h-2 min-w-12 grow rounded-full" style={{ background: CLOUD_GRADIENT }} aria-hidden="true" />
+        <span className="font-mono text-muted">−62°</span>
+        <span className="ml-2 flex shrink-0 items-center gap-1.5">
+          <span className="size-1.5 rounded-full bg-[#FFF6C2] shadow-[0_0_6px_2px_rgba(255,225,77,0.5)]" aria-hidden="true" />
+          Rayo
+        </span>
+      </div>
+      <button
+        type="button"
+        aria-pressed={allClouds}
+        onClick={onToggleClouds}
+        className="flex min-h-9 items-center gap-2 self-start text-xs text-soft"
+      >
+        <span
+          className={`flex size-4 items-center justify-center rounded border ${allClouds ? "border-quiet bg-quiet text-bg" : "border-line"}`}
+          aria-hidden="true"
+        >
+          {allClouds && <CheckIcon size={12} />}
+        </span>
+        <span className="h-2 w-5 rounded-full bg-[#d6dee7]/60" aria-hidden="true" />
+        Todas las nubes, en gris
+      </button>
     </div>
   );
 }

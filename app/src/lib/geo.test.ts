@@ -45,6 +45,7 @@ function status(overrides: Partial<Status> = {}): Status {
     flashes_per_5min: [],
     cloud_tops: [],
     cold_pixels: [],
+    cloud_field: null,
     cold_history: [],
     observed_bbox: { lat_min: -35.5, lat_max: -33.5, lon_min: -72.5, lon_max: -69.5 },
     recent_flashes: [],
