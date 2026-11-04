@@ -41,13 +41,13 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
-// Chrome may offer the install dialog before React hydrates: keep the event for the
-// "Instalar" button (src/lib/install.ts).
-const KEEP_INSTALL_PROMPT = `addEventListener("beforeinstallprompt",function(e){e.preventDefault();window.__installPrompt=e;dispatchEvent(new Event("miranubes:installable"))});addEventListener("appinstalled",function(){window.__installPrompt=null})`;
+// Marks that JavaScript runs (scroll reveals hide content only then), and keeps Chrome's
+// install dialog, which may fire before React hydrates, for the "Instalar" button.
+const KEEP_INSTALL_PROMPT = `document.documentElement.classList.add("js");addEventListener("beforeinstallprompt",function(e){e.preventDefault();window.__installPrompt=e;dispatchEvent(new Event("miranubes:installable"))});addEventListener("appinstalled",function(){window.__installPrompt=null})`;
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="es" className={`${plexSans.variable} ${plexMono.variable} ${spaceGrotesk.variable} antialiased`}>
+    <html lang="es" suppressHydrationWarning className={`${plexSans.variable} ${plexMono.variable} ${spaceGrotesk.variable} antialiased`}>
       <head>
         <script dangerouslySetInnerHTML={{ __html: KEEP_INSTALL_PROMPT }} />
       </head>
