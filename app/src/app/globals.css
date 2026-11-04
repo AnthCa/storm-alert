@@ -69,8 +69,8 @@ body {
   }
 }
 
-/* Landing motion (/conoce). Content is hidden only when JS runs (html.js), and every
-   effect stops for people who ask for less motion. */
+/* Landing motion (/conoce): weather-instrument effects, CSS only. Content hides only
+   when JS runs (html.js), and every effect stops for people who ask for less motion. */
 .js .reveal {
   opacity: 0;
   transform: translateY(28px);
@@ -82,82 +82,46 @@ body {
   opacity: 1;
   transform: none;
 }
-
-.sky-glow {
-  background:
-    radial-gradient(60% 55% at 30% 35%, rgb(31 107 209 / 0.22), transparent 70%),
-    radial-gradient(45% 45% at 78% 60%, rgb(242 165 58 / 0.14), transparent 70%);
-  animation: sky-breathe 9s ease-in-out infinite alternate;
+.js .reveal .mn-bar {
+  transform: scaleX(0);
 }
-@keyframes sky-breathe {
-  from { opacity: 0.7; transform: scale(1); }
-  to { opacity: 1; transform: scale(1.06); }
+.js .reveal.is-shown .mn-bar {
+  transform: scaleX(1);
+  transition: transform 1.6s cubic-bezier(0.22, 1, 0.36, 1) 0.2s;
 }
-
-.sky-cloud {
-  filter: blur(8px);
-  animation: sky-drift linear infinite alternate;
-}
-@keyframes sky-drift {
-  from { transform: translateX(-40px); }
-  to { transform: translateX(80px); }
+.mn-bar {
+  transform-origin: left;
 }
 
-.sky-flash {
-  opacity: 0;
-  box-shadow: 0 0 14px 5px rgb(255 225 77 / 0.55);
-  animation: sky-flash 6.5s ease-out infinite;
+@keyframes mn-sweep { to { transform: rotate(360deg); } }
+@keyframes mn-pulse {
+  0%, 100% { transform: scale(1); opacity: 0.9; }
+  50% { transform: scale(1.08); opacity: 1; }
 }
-@keyframes sky-flash {
-  0%, 88%, 100% { opacity: 0; }
-  89% { opacity: 1; }
-  91% { opacity: 0.2; }
-  92% { opacity: 0.9; }
+@keyframes mn-blip {
+  0%, 100% { opacity: 0; transform: scale(0.4); }
+  8% { opacity: 1; transform: scale(1); }
+  30% { opacity: 0.35; }
+  60% { opacity: 0; }
 }
-
-.sky-scan {
-  top: -10rem;
-  background: linear-gradient(to bottom, transparent, rgb(56 214 232 / 0.035) 70%, rgb(56 214 232 / 0.16) 99%, transparent);
-  animation: sky-scan 7s cubic-bezier(0.45, 0, 0.55, 1) infinite;
-}
-@keyframes sky-scan {
-  from { transform: translateY(0); }
-  to { transform: translateY(calc(100vh + 10rem)); }
-}
-
-.phone-float {
-  animation: phone-float 6s ease-in-out infinite;
-}
-@keyframes phone-float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-10px); }
-}
-
-.satellite {
-  filter: drop-shadow(0 0 10px rgb(56 214 232 / 0.45));
-  transition: top 0.15s linear;
-}
-
-.word-in {
-  animation: word-in 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-@keyframes word-in {
+@keyframes mn-scan { from { transform: translateY(-100%); } to { transform: translateY(100%); } }
+@keyframes mn-ring { from { transform: scale(0.2); opacity: 0.8; } to { transform: scale(1.6); opacity: 0; } }
+@keyframes mn-ticker { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+@keyframes mn-in {
   from { opacity: 0; transform: translateY(0.4em); filter: blur(6px); }
   to { opacity: 1; transform: none; filter: none; }
 }
-
-.lift {
-  transition: transform 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
-}
-.lift:hover {
-  transform: translateY(-4px);
-  border-color: #2f4a66;
-  box-shadow: 0 18px 40px -20px rgb(56 214 232 / 0.35);
-}
+.mn-sweep { animation: mn-sweep 6s linear infinite; }
+.mn-pulse { animation: mn-pulse 5s ease-in-out infinite; }
+.mn-blip { animation: mn-blip 6s ease-out infinite; }
+.mn-scan { animation: mn-scan 4.5s cubic-bezier(0.45, 0, 0.55, 1) infinite; }
+.mn-ring { animation: mn-ring 2.4s ease-out infinite; }
+.mn-ticker { animation: mn-ticker 38s linear infinite; }
+.mn-in { animation: mn-in 0.9s cubic-bezier(0.22, 1, 0.36, 1) both; }
 
 @media (prefers-reduced-motion: reduce) {
   .js .reveal { opacity: 1; transform: none; transition: none; }
-  .sky-glow, .sky-cloud, .sky-scan, .phone-float, .word-in { animation: none; }
-  .sky-flash { animation: none; opacity: 0.3; }
-  .lift, .lift:hover { transition: none; transform: none; }
+  .js .reveal .mn-bar { transform: none; transition: none; }
+  .mn-sweep, .mn-pulse, .mn-scan, .mn-ring, .mn-ticker, .mn-in { animation: none; }
+  .mn-blip { animation: none; opacity: 0.8; }
 }

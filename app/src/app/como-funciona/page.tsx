@@ -4,7 +4,12 @@ import { DemoLink } from "@/components/DemoLink";
 import { BoltIcon, CloudIcon, CodeIcon, ExternalIcon } from "@/components/Icons";
 import { Card, Note, PageShell } from "@/components/PageShell";
 
-export const metadata: Metadata = { title: "Cómo funciona · Miranubes" };
+export const metadata: Metadata = {
+  title: "Cómo funciona · Miranubes",
+  description:
+    "Qué mira el satélite GOES-19, los niveles de alerta, el caso del tornado de Requínoa y los límites de Miranubes.",
+  alternates: { canonical: "/como-funciona" },
+};
 
 // Mercado Pago link without a set amount: each person chooses how much to give.
 const DONATE_URL = "https://link.mercadopago.cl/miranubes";

@@ -2,7 +2,12 @@ import type { Metadata } from "next";
 import { InstallCard } from "@/components/InstallCard";
 import { Card, PageShell } from "@/components/PageShell";
 
-export const metadata: Metadata = { title: "Instalar · Miranubes" };
+export const metadata: Metadata = {
+  title: "Instalar · Miranubes",
+  description:
+    "Instala Miranubes en tu teléfono Android o iPhone desde el navegador, sin tienda de apps, con un ícono en tu pantalla de inicio.",
+  alternates: { canonical: "/instalar" },
+};
 
 const WHY = [
   { title: "Se abre al instante", text: "Un ícono en tu pantalla de inicio, a pantalla completa, sin buscar la página." },

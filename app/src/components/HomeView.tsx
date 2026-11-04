@@ -91,6 +91,7 @@ export function HomeView() {
 
   return (
     <main className="relative h-dvh overflow-hidden lg:flex lg:pt-16">
+      <h1 className="sr-only">Miranubes: tormentas y rayos en vivo sobre O&apos;Higgins</h1>
       <div className="absolute inset-x-0 top-0 bottom-18 lg:relative lg:inset-auto lg:flex lg:min-w-0 lg:grow lg:flex-col">
         <div className="relative size-full lg:min-h-0 lg:grow">
           <StormMap

@@ -1,7 +1,12 @@
 import type { Metadata } from "next";
 import { PageShell } from "@/components/PageShell";
 
-export const metadata: Metadata = { title: "Privacidad · Miranubes" };
+export const metadata: Metadata = {
+  title: "Privacidad · Miranubes",
+  description:
+    "Qué ubicación usa Miranubes, dónde se guarda, qué terceros reciben solicitudes técnicas y cómo funcionan las notificaciones.",
+  alternates: { canonical: "/privacidad" },
+};
 
 const SECTIONS = [
   {

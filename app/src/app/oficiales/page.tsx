@@ -3,7 +3,12 @@ import { ExternalIcon } from "@/components/Icons";
 import { Note, PageShell } from "@/components/PageShell";
 import { OFFICIAL_SOURCES } from "@/lib/official";
 
-export const metadata: Metadata = { title: "Avisos oficiales · Miranubes" };
+export const metadata: Metadata = {
+  title: "Avisos oficiales · Miranubes",
+  description:
+    "Dónde ver los avisos oficiales de tormentas y emergencias para O'Higgins: SENAPRED y la Dirección Meteorológica de Chile.",
+  alternates: { canonical: "/oficiales" },
+};
 
 export default function OfficialPage() {
   return (

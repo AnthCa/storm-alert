@@ -2,7 +2,12 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Card, Note, PageShell } from "@/components/PageShell";
 
-export const metadata: Metadata = { title: "Patrocinar · Miranubes" };
+export const metadata: Metadata = {
+  title: "Patrocinar · Miranubes",
+  description:
+    "Apoya una app gratuita que muestra en vivo las tormentas sobre O'Higgins. Qué recibe tu organización y las reglas que no cambian.",
+  alternates: { canonical: "/patrocinar" },
+};
 
 const CONTACT_EMAIL = "anthonycca8@gmail.com";
 

@@ -5,6 +5,7 @@ import { BottomNav } from "@/components/BottomNav";
 import { ServiceWorker } from "@/components/ServiceWorker";
 import { StatusProvider } from "@/components/StatusProvider";
 import { TitleBadge } from "@/components/TitleBadge";
+import { APP_URL } from "@/lib/share";
 import "./globals.css";
 
 const plexSans = IBM_Plex_Sans({
@@ -26,10 +27,26 @@ const plexMono = IBM_Plex_Mono({
   weight: ["500"],
 });
 
+const DESCRIPTION =
+  "Nubes de tormenta y rayos sobre la región de O'Higgins, en vivo desde el satélite GOES-19, con la distancia a tu casa y a los lugares de tu gente. Gratis y experimental.";
+
 export const metadata: Metadata = {
+  metadataBase: new URL(APP_URL),
   title: "Miranubes · Tormentas en vivo para O'Higgins",
-  description: "Tormentas severas en la región de O'Higgins, en vivo desde el satélite GOES-19.",
+  description: DESCRIPTION,
   applicationName: "Miranubes",
+  keywords: ["tormentas", "rayos", "O'Higgins", "Rancagua", "Requínoa", "satélite", "GOES-19", "tornado", "Chile", "clima"],
+  alternates: { canonical: "/" },
+  openGraph: {
+    type: "website",
+    locale: "es_CL",
+    siteName: "Miranubes",
+    title: "Miranubes · Tormentas en vivo para O'Higgins",
+    description: DESCRIPTION,
+    url: "/",
+    images: [{ url: "/promo/og.jpg", width: 1200, height: 630, alt: "Mapa de Miranubes con una tormenta y rayos sobre Requínoa" }],
+  },
+  twitter: { card: "summary_large_image", images: ["/promo/og.jpg"] },
   appleWebApp: { capable: true, title: "Miranubes", statusBarStyle: "black-translucent" },
 };
 
@@ -47,7 +64,7 @@ const KEEP_INSTALL_PROMPT = `document.documentElement.classList.add("js");addEve
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="es" suppressHydrationWarning className={`${plexSans.variable} ${plexMono.variable} ${spaceGrotesk.variable} antialiased`}>
+    <html lang="es-CL" suppressHydrationWarning className={`${plexSans.variable} ${plexMono.variable} ${spaceGrotesk.variable} antialiased`}>
       <head>
         <script dangerouslySetInnerHTML={{ __html: KEEP_INSTALL_PROMPT }} />
       </head>
