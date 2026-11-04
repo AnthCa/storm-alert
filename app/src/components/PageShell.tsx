@@ -4,8 +4,8 @@ import { ChevronLeftIcon } from "./Icons";
 /** Scrolling page with a back link to the map, leaving room for the bottom nav. */
 export function PageShell({ title, intro, children }: { title: string; intro?: string; children: React.ReactNode }) {
   return (
-    <main className="mx-auto flex max-w-xl flex-col gap-6 px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-28">
-      <Link href="/" className="flex min-h-11 items-center gap-1.5 self-start text-[15px] text-quiet">
+    <main className="mx-auto flex max-w-xl flex-col gap-6 px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-28 lg:max-w-2xl lg:pt-28 lg:pb-16">
+      <Link href="/" className="flex min-h-11 items-center gap-1.5 self-start text-[15px] text-quiet lg:hidden">
         <ChevronLeftIcon size={20} /> Mapa
       </Link>
       <div className="flex flex-col gap-2.5">

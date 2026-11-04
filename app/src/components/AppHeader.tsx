@@ -10,10 +10,11 @@ const UPDATE_EVERY_MIN = 10;
 export function AppHeader({ status, state, now }: { status: Status | null; state: DataState; now: number }) {
   return (
     <header className="flex flex-col gap-1.5">
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex items-center justify-between gap-2 lg:justify-end">
         {/* A solid capsule: the header floats over the map, and markers or lines passing
             under the wordmark made it hard to read. */}
-        <div className="flex items-center gap-2 rounded-full border border-line bg-bg/90 py-1.5 pr-2 pl-3 backdrop-blur-sm">
+        {/* On wide screens the top bar already carries the name. */}
+        <div className="flex items-center gap-2 rounded-full border border-line bg-bg/90 py-1.5 pr-2 pl-3 backdrop-blur-sm lg:hidden">
           <LogoMark size={18} compact />
           <Wordmark className="text-[18px]" />
           <span className="rounded-md border border-line px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-soft">

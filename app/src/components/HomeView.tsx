@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { useNow, useStoredValue } from "@/lib/browser-store";
+import { useNow, useStoredValue, useWide } from "@/lib/browser-store";
 import {
   AROUND_KM,
   NEAR_KM,
@@ -26,6 +26,7 @@ import { ago, dataState, formatC, localTime, type DataState, type Status } from 
 import { BoltFilledIcon, CheckIcon, ChevronRightIcon, CloudIcon, InfoIcon, LocateIcon, PinIcon, PlayIcon, WarningIcon } from "./Icons";
 import { AppHeader } from "./AppHeader";
 import { DemoBanner } from "./DemoBanner";
+import { CloudTrend, SavedPlacesTable, TimeStrip } from "./DesktopPanels";
 import { ShareStatus } from "./ShareStatus";
 import { useStatus } from "./StatusProvider";
 
@@ -46,6 +47,9 @@ export function HomeView() {
   const [replay, setReplay] = useState<{ frames: ReplayFrame[]; index: number } | null>(null);
   // The grey "sky from above" layer is on unless the viewer turned it off.
   const [allClouds, setAllClouds] = useStoredValue(ALL_CLOUDS_KEY, true);
+  // Wide screens: map and time strip on the left, an always-open detail panel on the right.
+  const wide = useWide();
+  const detailed = expanded || wide;
 
   useEffect(() => {
     if (!replay) return;
@@ -74,45 +78,61 @@ export function HomeView() {
     );
   }
 
-  return (
-    <main className="relative h-dvh overflow-hidden">
-      <div className="absolute inset-x-0 top-0 bottom-18">
-        <StormMap
-          status={status}
-          place={place}
-          onPick={(lat, lon) => setPlace({ lat, lon, source: "map" })}
-          summaryId="storm-summary"
-          replay={replay ? replay.frames[replay.index] : null}
-          allClouds={allClouds}
-        />
-      </div>
+  const locateButton = (
+    <button
+      type="button"
+      onClick={handleLocate}
+      aria-label="Usar mi ubicación"
+      className={`absolute flex size-12 items-center justify-center rounded-full border border-line bg-surface ${wide ? "right-4 bottom-4" : "-top-16 right-4"}`}
+    >
+      <LocateIcon />
+    </button>
+  );
 
-      {/* Keeps whatever floats on top readable over any part of the map. */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-bg/85 via-bg/40 to-transparent" />
-      <div
-        id="map-top-overlay"
-        className="pointer-events-none absolute inset-x-0 top-0 flex flex-col gap-2.5 px-4 pt-[max(1rem,env(safe-area-inset-top))]"
-      >
-        <AppHeader status={status} state={state} now={now} />
-        <DemoBanner />
-        <StateBanner status={status} state={state} error={error} now={now} hasPlace={!!place} />
+  return (
+    <main className="relative h-dvh overflow-hidden lg:flex lg:pt-16">
+      <div className="absolute inset-x-0 top-0 bottom-18 lg:relative lg:inset-auto lg:flex lg:min-w-0 lg:grow lg:flex-col">
+        <div className="relative size-full lg:min-h-0 lg:grow">
+          <StormMap
+            status={status}
+            place={place}
+            onPick={(lat, lon) => setPlace({ lat, lon, source: "map" })}
+            summaryId="storm-summary"
+            replay={replay ? replay.frames[replay.index] : null}
+            allClouds={allClouds}
+          />
+
+          {/* Keeps whatever floats on top readable over any part of the map. */}
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-bg/85 via-bg/40 to-transparent" />
+          <div
+            id="map-top-overlay"
+            className="pointer-events-none absolute inset-x-0 top-0 flex flex-col gap-2.5 px-4 pt-[max(1rem,env(safe-area-inset-top))] lg:max-w-3xl"
+          >
+            <AppHeader status={status} state={state} now={now} />
+            <DemoBanner />
+            <StateBanner status={status} state={state} error={error} now={now} hasPlace={!!place} />
+          </div>
+          {wide && locateButton}
+        </div>
+        {wide && status && frames.length >= 2 && (
+          <TimeStrip
+            status={status}
+            frames={frames}
+            playing={replay ? replay.index : null}
+            onPlay={(index) => setReplay({ frames, index })}
+            onStop={() => setReplay(null)}
+          />
+        )}
       </div>
 
       <section
         id="storm-summary"
-        className="absolute inset-x-0 bottom-18 z-10 flex flex-col gap-2.5 rounded-t-[22px] border-t border-line bg-surface px-4 pt-1 pb-3"
+        className="absolute inset-x-0 bottom-18 z-10 flex flex-col gap-2.5 rounded-t-[22px] border-t border-line bg-surface px-4 pt-1 pb-3 lg:static lg:w-[380px] lg:shrink-0 xl:w-[420px] lg:gap-5 lg:overflow-y-auto lg:rounded-none lg:border-t-0 lg:border-l lg:bg-bg lg:p-5"
         aria-label="Actividad en tu ubicación"
         aria-live="polite"
       >
-        <button
-          type="button"
-          onClick={handleLocate}
-          aria-label="Usar mi ubicación"
-          className="absolute -top-16 right-4 flex size-12 items-center justify-center rounded-full border border-line bg-surface"
-        >
-          <LocateIcon />
-        </button>
-        {frames.length >= 2 && (
+        {!wide && locateButton}
+        {!wide && frames.length >= 2 && (
           <ReplayButton
             frames={frames}
             playing={replay ? replay.frames[replay.index] : null}
@@ -120,16 +140,23 @@ export function HomeView() {
             onStop={() => setReplay(null)}
           />
         )}
-        <button
-          type="button"
-          onClick={() => setExpanded(!expanded)}
-          aria-expanded={expanded}
-          aria-controls="storm-details"
-          aria-label={expanded ? "Ocultar detalles" : "Ver detalles"}
-          className="flex min-h-6 w-full items-center justify-center"
-        >
-          <span className="h-1 w-10 rounded-full bg-[#3a424d]" aria-hidden="true" />
-        </button>
+        {!wide && (
+          <button
+            type="button"
+            onClick={() => setExpanded(!expanded)}
+            aria-expanded={expanded}
+            aria-controls="storm-details"
+            aria-label={expanded ? "Ocultar detalles" : "Ver detalles"}
+            className="flex min-h-6 w-full items-center justify-center"
+          >
+            <span className="h-1 w-10 rounded-full bg-[#3a424d]" aria-hidden="true" />
+          </button>
+        )}
+        {wide && status && (
+          <p className="text-[13px] text-soft">
+            Datos de nubes {localTime(status.latest_scan_utc)} · rayos {localTime(status.data_until_utc)}
+          </p>
+        )}
         {place && activity && status ? (
           <PlaceSummary
             activity={activity}
@@ -137,14 +164,14 @@ export function HomeView() {
             state={state}
             place={place}
             town={nearestTown(place.lat, place.lon)}
-            detailed={expanded}
+            detailed={detailed}
             onClear={clearPlace}
           />
         ) : (
           <div className="flex items-center gap-3">
             <div className="flex grow flex-col gap-0.5">
               <h2 className="text-lg font-bold tracking-tight">¿Dónde estás?</h2>
-              <p className="text-[13px] text-soft">Usa tu ubicación o toca el mapa.</p>
+              <p className="text-[13px] text-soft">Usa tu ubicación o {wide ? "haz clic en" : "toca"} el mapa.</p>
             </div>
             <button
               type="button"
@@ -160,8 +187,13 @@ export function HomeView() {
             {locateMessage}
           </p>
         )}
+        {wide && status && (
+          <Stats status={status} activity={activity} current={state === "healthy" || state === "degraded"} />
+        )}
+        {wide && status && <SavedPlacesTable status={status} />}
+        {wide && status && <CloudTrend status={status} />}
         <Legend allClouds={allClouds} onToggleClouds={() => setAllClouds(!allClouds)} />
-        {expanded && (
+        {detailed && (
           <div id="storm-details" className="flex flex-col gap-3">
             <p className="text-[13px] text-soft">
               Colores de las nubes: más fría = más alta = tormenta más intensa. Naranja desde −38 °C (nube de
@@ -169,22 +201,28 @@ export function HomeView() {
               {status ? localTime(status.latest_scan_utc) : "—"} y de rayos hasta las{" "}
               {status ? localTime(status.data_until_utc) : "—"}.
             </p>
-            {status && (
+            {status && !wide && (
               <Stats status={status} activity={activity} current={state === "healthy" || state === "degraded"} />
             )}
             {status && state === "healthy" && <ShareStatus status={status} />}
           </div>
         )}
-        <button
-          type="button"
-          onClick={() => setExpanded(!expanded)}
-          aria-expanded={expanded}
-          aria-controls="storm-details"
-          className="flex min-h-9 items-center justify-center gap-1 text-[13px] font-semibold text-quiet"
-        >
-          {expanded ? "Ocultar detalles" : "Ver detalles"}
-          <ChevronRightIcon size={14} className={expanded ? "-rotate-90" : "rotate-90"} />
-        </button>
+        {wide ? (
+          <p className="text-xs leading-relaxed text-muted">
+            Observación experimental. No reemplaza los avisos de SENAPRED ni de la Dirección Meteorológica.
+          </p>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setExpanded(!expanded)}
+            aria-expanded={expanded}
+            aria-controls="storm-details"
+            className="flex min-h-9 items-center justify-center gap-1 text-[13px] font-semibold text-quiet"
+          >
+            {expanded ? "Ocultar detalles" : "Ver detalles"}
+            <ChevronRightIcon size={14} className={expanded ? "-rotate-90" : "rotate-90"} />
+          </button>
+        )}
       </section>
     </main>
   );

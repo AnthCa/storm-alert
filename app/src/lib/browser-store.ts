@@ -101,3 +101,20 @@ export function useNow(): number {
     () => 0,
   );
 }
+
+// Wide screens (laptops and desktops) get the dashboard layout; Tailwind's `lg` breakpoint.
+const WIDE_QUERY = "(min-width: 1024px)";
+function subscribeWide(listener: () => void) {
+  const query = window.matchMedia(WIDE_QUERY);
+  query.addEventListener("change", listener);
+  return () => query.removeEventListener("change", listener);
+}
+
+/** True on screens at least 1024 px wide; false on the server and during hydration. */
+export function useWide(): boolean {
+  return useSyncExternalStore(
+    subscribeWide,
+    () => window.matchMedia(WIDE_QUERY).matches,
+    () => false,
+  );
+}
