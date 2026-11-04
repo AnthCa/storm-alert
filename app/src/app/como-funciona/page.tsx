@@ -182,6 +182,9 @@ export default function HowItWorksPage() {
 
       <footer className="flex flex-col gap-2 text-[13px] text-muted">
         <p>Datos: NOAA GOES-19 (ABI y GLM), públicos y gratuitos. Mapa: OpenFreeMap y OpenStreetMap.</p>
+        <Link href="/conoce" className="flex min-h-11 items-center text-sm text-quiet">
+          Conoce Miranubes: por qué nació
+        </Link>
         <Link href="/instalar" className="flex min-h-11 items-center text-sm text-quiet">
           Instalar la app en tu teléfono
         </Link>
