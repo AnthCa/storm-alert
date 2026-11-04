@@ -26,6 +26,9 @@ dependencies = [
 [project.scripts]
 requinoa-download = "requinoa_2026.download:main"
 requinoa-analyze = "requinoa_2026.analyze:main"
+requinoa-imerg = "requinoa_2026.imerg:main"
+requinoa-abi-grid = "requinoa_2026.abi_grid:main"
+requinoa-score = "requinoa_2026.score:main"
 requinoa-goes = "requinoa_2026.goes:main"
 requinoa-satellite = "requinoa_2026.satellite_analysis:main"
 requinoa-false-alarms = "requinoa_2026.false_alarms:main"
