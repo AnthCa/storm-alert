@@ -70,17 +70,18 @@ jobs:
               oidc_token: await core.getIDToken(),
             });
             core.setOutput("page_url", data.page_url);
-            for (let i = 0; i < 60; i++) {
+            const deployment = { owner, repo, id: data.id };
+            for (let i = 0; i < 36; i++) {
               await new Promise((done) => setTimeout(done, 5000));
-              const { data: state } = await github.request(
-                "GET /repos/{owner}/{repo}/pages/deployments/{id}",
-                { owner, repo, id: data.id },
-              );
+              const { data: state } = await github.request("GET /repos/{owner}/{repo}/pages/deployments/{id}", deployment);
               core.info(`Pages deployment ${version}: ${state.status}`);
               if (state.status === "succeed") return;
               if (/fail|error|cancel|expired/.test(state.status)) throw new Error(`Pages deployment ${state.status}`);
             }
-            throw new Error("Pages deployment timed out");
+            // A deployment left in progress blocks every later one, so give up on it explicitly
+            // (as actions/deploy-pages does) and let the next run publish.
+            await github.request("POST /repos/{owner}/{repo}/pages/deployments/{id}/cancel", deployment);
+            throw new Error("Pages deployment timed out and was cancelled");
       # Pilot Web Push for invited testers. Off unless the PUSH_ENABLED variable is
       # "true" (the kill switch), and never fails the map update.
       - name: Send pilot notifications
