@@ -36,11 +36,40 @@ jobs:
           mkdir -p site
           cp data/realtime/status.html site/index.html
           cp data/realtime/status.json site/status.json
-      - uses: actions/upload-pages-artifact@v3
+      - id: artifact
+        uses: actions/upload-pages-artifact@v3
         with:
           path: research/requinoa-2026/site
+      # actions/deploy-pages labels every deployment with the commit sha. On 2026-11-05 Pages
+      # kept serving an old copy while every run with that same label reported success, so
+      # each run deploys under its own build version instead.
       - id: deploy
-        uses: actions/deploy-pages@v4
+        uses: actions/github-script@v7
+        env:
+          ARTIFACT_ID: ${{ steps.artifact.outputs.artifact_id }}
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const version = `${context.sha}-${context.runId}-${context.runAttempt}`;
+            const { data } = await github.request("POST /repos/{owner}/{repo}/pages/deployments", {
+              owner,
+              repo,
+              artifact_id: Number(process.env.ARTIFACT_ID),
+              pages_build_version: version,
+              oidc_token: await core.getIDToken(),
+            });
+            core.setOutput("page_url", data.page_url);
+            for (let i = 0; i < 60; i++) {
+              await new Promise((done) => setTimeout(done, 5000));
+              const { data: state } = await github.request(
+                "GET /repos/{owner}/{repo}/pages/deployments/{id}",
+                { owner, repo, id: data.id },
+              );
+              core.info(`Pages deployment ${version}: ${state.status}`);
+              if (state.status === "succeed") return;
+              if (/fail|error|cancel|expired/.test(state.status)) throw new Error(`Pages deployment ${state.status}`);
+            }
+            throw new Error("Pages deployment timed out");
       # Pilot Web Push for invited testers. Off unless the PUSH_ENABLED variable is
       # "true" (the kill switch), and never fails the map update.
       - name: Send pilot notifications
