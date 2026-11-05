@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write  # only for the per-run build commit below; the checkout keeps no credentials
   pages: write
   id-token: write
 
@@ -26,6 +26,8 @@ jobs:
         working-directory: research/requinoa-2026
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: astral-sh/setup-uv@v6
         with:
           enable-cache: true
@@ -41,8 +43,9 @@ jobs:
         with:
           path: research/requinoa-2026/site
       # actions/deploy-pages labels every deployment with the commit sha. On 2026-11-05 Pages
-      # kept serving an old copy while every run with that same label reported success, so
-      # each run deploys under its own build version instead.
+      # kept serving an old copy while every run with that same label reported success.
+      # Pages only accepts a commit sha as the label, so each run creates a commit object
+      # (on no branch) and deploys under its sha.
       - id: deploy
         uses: actions/github-script@v7
         env:
@@ -50,7 +53,15 @@ jobs:
         with:
           script: |
             const { owner, repo } = context.repo;
-            const version = `${context.sha}-${context.runId}-${context.runAttempt}`;
+            const { data: head } = await github.rest.git.getCommit({ owner, repo, commit_sha: context.sha });
+            const { data: build } = await github.rest.git.createCommit({
+              owner,
+              repo,
+              message: `Pages build for run ${context.runId}`,
+              tree: head.tree.sha,
+              parents: [context.sha],
+            });
+            const version = build.sha;
             const { data } = await github.request("POST /repos/{owner}/{repo}/pages/deployments", {
               owner,
               repo,
