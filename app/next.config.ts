@@ -5,6 +5,8 @@ const STATUS_ORIGIN = "https://anthca.github.io";
 const MAP_ORIGIN = "https://tiles.openfreemap.org";
 // Elevation tiles for the shaded relief (AWS Open Data).
 const RELIEF_ORIGIN = "https://s3.amazonaws.com";
+// Current conditions at the viewer's (coarsened) place.
+const WEATHER_ORIGIN = "https://api.open-meteo.com";
 // The push pilot subscribes through Supabase; empty when the pilot is not configured.
 const PUSH_ORIGIN = process.env.NEXT_PUBLIC_SUPABASE_URL ? new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).origin : "";
 
@@ -18,7 +20,7 @@ const csp = [
   "style-src 'self' 'unsafe-inline'",
   `img-src 'self' data: blob: ${MAP_ORIGIN} ${RELIEF_ORIGIN}`,
   "font-src 'self'",
-  `connect-src 'self' ${STATUS_ORIGIN} ${MAP_ORIGIN} ${RELIEF_ORIGIN} ${PUSH_ORIGIN}`.trim(),
+  `connect-src 'self' ${STATUS_ORIGIN} ${MAP_ORIGIN} ${RELIEF_ORIGIN} ${WEATHER_ORIGIN} ${PUSH_ORIGIN}`.trim(),
   "worker-src 'self' blob:",
   "child-src blob:",
   "manifest-src 'self'",

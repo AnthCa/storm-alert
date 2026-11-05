@@ -29,6 +29,7 @@ import { DemoBanner } from "./DemoBanner";
 import { CloudTrend, SavedPlacesTable, TimeStrip } from "./DesktopPanels";
 import { ShareStatus } from "./ShareStatus";
 import { useStatus } from "./StatusProvider";
+import { WeatherDetails, WeatherLine } from "./WeatherNow";
 
 // MapLibre needs the browser (WebGL), so the map is never server-rendered.
 const StormMap = dynamic(() => import("./StormMap"), {
@@ -76,6 +77,11 @@ export function HomeView() {
   const state = dataState(status, { demo, online, now: now ? new Date(now) : undefined });
   const activity = status && place ? activityAt(status, place.lat, place.lon) : null;
   const frames = status && state !== "historical" ? replayFrames(status) : [];
+  // Current conditions only make sense for live data at a chosen place.
+  const weather =
+    place && status && !demo && state !== "historical"
+      ? { lat: place.lat, lon: place.lon, town: nearestTown(place.lat, place.lon), refreshKey: status.data_until_utc }
+      : null;
 
   async function handleLocate() {
     setLocateMessage("Buscando tu ubicación…");
@@ -196,6 +202,7 @@ export function HomeView() {
             </button>
           </div>
         )}
+        {weather && (wide ? <WeatherDetails {...weather} /> : !expanded && <WeatherLine {...weather} />)}
         {locateMessage && (
           <p className="text-[13px] text-soft" role="status">
             {locateMessage}
@@ -215,6 +222,7 @@ export function HomeView() {
               {status ? localTime(status.latest_scan_utc) : "—"} y de rayos hasta las{" "}
               {status ? localTime(status.data_until_utc) : "—"}.
             </p>
+            {weather && !wide && <WeatherDetails {...weather} />}
             {status && !wide && (
               <Stats status={status} activity={activity} current={state === "healthy" || state === "degraded"} />
             )}
