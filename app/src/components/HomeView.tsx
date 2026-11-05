@@ -45,6 +45,17 @@ export function HomeView() {
   const [expanded, setExpanded] = useState(false);
   // Replay of the last scans: the frames are taken when it starts, so new data does not cut it.
   const [replay, setReplay] = useState<{ frames: ReplayFrame[]; index: number } | null>(null);
+  // The map (MapLibre) is the heaviest part of the page: load it once the status text has
+  // had its chance to paint, so the answer people came for shows first.
+  const [mapReady, setMapReady] = useState(false);
+  useEffect(() => {
+    if ("requestIdleCallback" in window) {
+      const id = requestIdleCallback(() => setMapReady(true), { timeout: 1200 });
+      return () => cancelIdleCallback(id);
+    }
+    const id = setTimeout(() => setMapReady(true), 300);
+    return () => clearTimeout(id);
+  }, []);
   // The grey "sky from above" layer is on unless the viewer turned it off.
   const [allClouds, setAllClouds] = useStoredValue(ALL_CLOUDS_KEY, true);
   // Wide screens: map and time strip on the left, an always-open detail panel on the right.
@@ -94,14 +105,16 @@ export function HomeView() {
       <h1 className="sr-only">Miranubes: tormentas y rayos en vivo sobre O&apos;Higgins</h1>
       <div className="absolute inset-x-0 top-0 bottom-18 lg:relative lg:inset-auto lg:flex lg:min-w-0 lg:grow lg:flex-col">
         <div className="relative size-full lg:min-h-0 lg:grow">
-          <StormMap
-            status={status}
-            place={place}
-            onPick={(lat, lon) => setPlace({ lat, lon, source: "map" })}
-            summaryId="storm-summary"
-            replay={replay ? replay.frames[replay.index] : null}
-            allClouds={allClouds}
-          />
+          {mapReady && (
+            <StormMap
+              status={status}
+              place={place}
+              onPick={(lat, lon) => setPlace({ lat, lon, source: "map" })}
+              summaryId="storm-summary"
+              replay={replay ? replay.frames[replay.index] : null}
+              allClouds={allClouds}
+            />
+          )}
 
           {/* Keeps whatever floats on top readable over any part of the map. */}
           <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-bg/85 via-bg/40 to-transparent" />

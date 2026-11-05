@@ -3,7 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { useOnline, useStoredValue } from "@/lib/browser-store";
 import { coarsen } from "@/lib/geo";
-import { DEMO_STATUS_URL, LIVE_STATUS_URL, fetchStatus, type Status } from "@/lib/status";
+import { DEMO_STATUS_URL, LIVE_STATUS_URL, fetchStatus, takeEarlyStatus, type Status } from "@/lib/status";
 
 const POLL_MS = 60_000;
 const LOCATION_KEY = "storm-alert:location";
@@ -54,14 +54,20 @@ export function StatusProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let cancelled = false;
-    const load = () =>
-      fetchStatus(demo ? DEMO_STATUS_URL : LIVE_STATUS_URL)
+    let first = !demo;
+    const load = () => {
+      // The first live load reuses the download the layout already started.
+      const early = first ? takeEarlyStatus() : Promise.resolve(null);
+      first = false;
+      return early
+        .then((s) => s ?? fetchStatus(demo ? DEMO_STATUS_URL : LIVE_STATUS_URL))
         .then((s) => {
           if (cancelled) return;
           setStatus(s);
           setError(null);
         })
         .catch((e: Error) => !cancelled && setError(e.message));
+    };
     load();
     if (demo) return () => void (cancelled = true);
     const timer = setInterval(load, POLL_MS);

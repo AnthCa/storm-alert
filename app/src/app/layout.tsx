@@ -6,6 +6,7 @@ import { ServiceWorker } from "@/components/ServiceWorker";
 import { StatusProvider } from "@/components/StatusProvider";
 import { TitleBadge } from "@/components/TitleBadge";
 import { APP_URL } from "@/lib/share";
+import { LIVE_STATUS_URL } from "@/lib/status";
 import "./globals.css";
 
 const plexSans = IBM_Plex_Sans({
@@ -60,13 +61,17 @@ export const viewport: Viewport = {
 
 // Marks that JavaScript runs (scroll reveals hide content only then), and keeps Chrome's
 // install dialog, which may fire before React hydrates, for the "Instalar" button.
+// Starts the live status download while the page is still parsing, instead of after
+// React hydrates; StatusProvider takes it over (src/components/StatusProvider.tsx).
+const EARLY_STATUS = `window.__earlyStatus=fetch(${JSON.stringify(LIVE_STATUS_URL)},{cache:"no-store"}).then(function(r){return r.ok?r.json():null}).catch(function(){return null});`;
+
 const KEEP_INSTALL_PROMPT = `document.documentElement.classList.add("js");addEventListener("beforeinstallprompt",function(e){e.preventDefault();window.__installPrompt=e;dispatchEvent(new Event("miranubes:installable"))});addEventListener("appinstalled",function(){window.__installPrompt=null})`;
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="es-CL" suppressHydrationWarning className={`${plexSans.variable} ${plexMono.variable} ${spaceGrotesk.variable} antialiased`}>
       <head>
-        <script dangerouslySetInnerHTML={{ __html: KEEP_INSTALL_PROMPT }} />
+        <script dangerouslySetInnerHTML={{ __html: EARLY_STATUS + KEEP_INSTALL_PROMPT }} />
       </head>
       <body className="min-h-dvh font-sans">
         <StatusProvider>

@@ -86,6 +86,21 @@ export const DEMO_STATUS_URL = "/demo/requinoa-2026-10-26.json";
 /** Data older than this is stale: the pipeline runs every 10 minutes, so two runs were missed. */
 export const STALE_AFTER_MIN = 25;
 
+declare global {
+  interface Window {
+    /** The live status download the layout starts before React loads; used once. */
+    __earlyStatus?: Promise<(Partial<Status> & Pick<Status, "level" | "data_until_utc">) | null>;
+  }
+}
+
+/** The status the page started downloading early, or null when there is none. */
+export async function takeEarlyStatus(): Promise<Status | null> {
+  const early = window.__earlyStatus;
+  window.__earlyStatus = undefined;
+  const raw = early ? await early : null;
+  return raw ? normalizeStatus(raw) : null;
+}
+
 export async function fetchStatus(url: string): Promise<Status> {
   const response = await fetch(url, { cache: "no-store" });
   if (!response.ok) throw new Error(`status.json returned ${response.status}`);
