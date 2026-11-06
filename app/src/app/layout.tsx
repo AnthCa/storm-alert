@@ -3,7 +3,6 @@ import type { Metadata, Viewport } from "next";
 import { IBM_Plex_Mono, IBM_Plex_Sans, Space_Grotesk } from "next/font/google";
 import { BottomNav } from "@/components/BottomNav";
 import { ServiceWorker } from "@/components/ServiceWorker";
-import { StandaloneViewport } from "@/components/StandaloneViewport";
 import { StatusProvider } from "@/components/StatusProvider";
 import { TitleBadge } from "@/components/TitleBadge";
 import { APP_URL } from "@/lib/share";
@@ -49,7 +48,9 @@ export const metadata: Metadata = {
     images: [{ url: "/promo/og.jpg", width: 1200, height: 630, alt: "Mapa de Miranubes con una tormenta y rayos sobre Requínoa" }],
   },
   twitter: { card: "summary_large_image", images: ["/promo/og.jpg"] },
-  appleWebApp: { capable: true, title: "Miranubes", statusBarStyle: "black-translucent" },
+  // "black", not "black-translucent": with the translucent bar and viewport-fit=cover,
+  // iOS 26 home-screen apps end short of the screen bottom and lift the tab bar.
+  appleWebApp: { capable: true, title: "Miranubes", statusBarStyle: "black" },
 };
 
 export const viewport: Viewport = {
@@ -81,7 +82,6 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           <TitleBadge />
         </StatusProvider>
         <ServiceWorker />
-        <StandaloneViewport />
         {/* Cookieless page-view counts; no location or personal data. */}
         <Analytics />
       </body>
