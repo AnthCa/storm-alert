@@ -150,6 +150,40 @@ rain of 1 mm/h, the false notices seen from the ground on 2026-11-02. The coast 
 worst. Most of the sample is winter frontal rain, not summer convection, and the warm
 season is one month: its intervals are wide. Full table: `data/results/score_s1_held-out.csv`.
 
+## Frozen on 2026-11-05 (rain chance r1)
+
+Fixed before any result was seen; see `rain_chance.py` for the exact rules.
+
+- What is scored: the app's "probabilidad de lluvia en la próxima hora", Open-Meteo's
+  ensemble `precipitation_probability` from its Historical Forecast API, at the 22 app
+  towns rounded to the 0.05° grid the app sends.
+- Unit: one town during one UTC hour. Truth: IMERG (0.1° cell of the town) >= 0.1 mm in
+  the hour, and separately >= 1 mm (steady rain).
+- Scores: Brier score, skill against dev-set climatology (town × month), reliability
+  per 10-point bin; 95% intervals by resampling whole days.
+- Calibration table fitted on the dev set only, applied once to the held-out set.
+- Same dev / held-out split as s1.
+
+## Results: rain chance r1 (run 2026-11-05)
+
+22 towns × every hour. Skill = Brier skill score against dev-set climatology (0 = no
+better than "the usual share of rainy hours for this town and month").
+
+| Set | Truth | Season | Raw Open-Meteo | Calibrated on dev |
+|---|---|---|---|---|
+| dev (359 days) | ≥ 0.1 mm | all | −0.20 (−0.37 to −0.05) | (fitted here) |
+| held-out (214 days) | ≥ 0.1 mm | all | 0.30 (0.13–0.42) | 0.37 (0.31–0.42) |
+| held-out | ≥ 0.1 mm | cold | 0.39 (0.27–0.50) | 0.37 (0.31–0.42) |
+| held-out | ≥ 0.1 mm | warm (32 days) | −0.24 (−1.19 to 0.30) | 0.33 (0.07–0.49) |
+| held-out | ≥ 1 mm | all | −0.94 | 0.26 (0.21–0.30) |
+
+Reading: the raw percentage is overconfident here. When it said 91–100 %, IMERG saw rain
+in 48 % of those hours in the dev year and 74 % in the held-out months; at 41–50 % it
+rained 19–26 % of the time. Calibration removes the worst errors (warm season, steady
+rain) but the table moves from one year to the next: one dev year is not enough to fix
+exact percentages. IMERG misses some light rain, so part of the gap may be the truth
+source; rain gauges (INIA, DMC) are needed to confirm. Files: `data/results/rain_chance_r1_*`.
+
 ## Reliability section in the app
 
 Published at the end of Phase A, and never before: no estimated or placeholder numbers.
