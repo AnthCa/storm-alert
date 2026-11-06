@@ -20,6 +20,11 @@ export interface Weather {
   windFrom: string;
   /** Rain over the last hour, from the four last 15-minute steps. */
   rainMm: number;
+  /**
+   * Chance of rain (> 0.1 mm) in the next hour, in %, from the model ensemble: the share of
+   * runs that rain. The highest of the hourly steps that overlap the coming hour.
+   */
+  rainChance: number | null;
   /** Local time of the model step the values belong to, "HH:MM". */
   at: string;
 }
@@ -42,6 +47,9 @@ export function weatherUrl(lat: number, lon: number): string {
     longitude: String(cLon),
     current: "temperature_2m,apparent_temperature,relative_humidity_2m,wind_speed_10m,wind_direction_10m,wind_gusts_10m",
     minutely_15: "precipitation",
+    hourly: "precipitation_probability",
+    past_hours: "1",
+    forecast_hours: "3",
     past_minutely_15: "4",
     forecast_minutely_15: "0",
     wind_speed_unit: "kmh",
@@ -61,6 +69,7 @@ interface OpenMeteoResponse {
     wind_gusts_10m: number;
   };
   minutely_15?: { precipitation?: (number | null)[] };
+  hourly?: { time?: string[]; precipitation_probability?: (number | null)[] };
 }
 
 export function parseWeather(raw: OpenMeteoResponse): Weather | null {
@@ -75,8 +84,34 @@ export function parseWeather(raw: OpenMeteoResponse): Weather | null {
     gustKmh: c.wind_gusts_10m,
     windFrom: compassFrom(c.wind_direction_10m),
     rainMm: Math.round(rain * 10) / 10,
+    rainChance: rainChance(raw.hourly, c.time),
     at: c.time.slice(11, 16),
   };
+}
+
+/**
+ * The model's chance of rain in words. In O'Higgins the raw percentage runs high: scored
+ * against NASA IMERG from 2025-04 to 2026-10 (research rain_chance r1), it rained in ~2 %
+ * of the hours at 0 %, ~10-20 % at 1-30 %, ~20-47 % at 31-90 % and ~50-75 % at 91-100 %.
+ * A word per band says what that record supports; an exact percentage would not.
+ */
+export function rainOutlook(chance: number): string {
+  if (chance <= 0) return "sin lluvia prevista";
+  if (chance <= 30) return "lluvia poco probable";
+  if (chance <= 90) return "lluvia posible";
+  return "lluvia probable";
+}
+
+const minutes = (iso: string) => Date.parse(`${iso}Z`) / 60000;
+
+/** Hourly values cover the hour that ENDS at their time stamp; keep the ones overlapping the next hour. */
+function rainChance(hourly: OpenMeteoResponse["hourly"], now: string): number | null {
+  const start = minutes(now);
+  const chances = (hourly?.time ?? [])
+    .map((t, i) => ({ end: minutes(t), chance: hourly?.precipitation_probability?.[i] }))
+    .filter((h) => h.end > start && h.end - 60 < start + 60 && typeof h.chance === "number")
+    .map((h) => h.chance as number);
+  return chances.length ? Math.max(...chances) : null;
 }
 
 const cache = new Map<string, { at: number; value: Promise<Weather | null> }>();

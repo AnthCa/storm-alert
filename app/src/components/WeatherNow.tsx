@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { fetchWeather, type Weather } from "@/lib/weather";
+import { fetchWeather, rainOutlook, type Weather } from "@/lib/weather";
 
-const SOURCE = "Modelo Open-Meteo, no un termómetro en tu calle: puede diferir 1 o 2 grados.";
+const SOURCE =
+  "Modelo Open-Meteo, no un termómetro en tu calle: puede diferir 1 o 2 grados. La lluvia de la próxima hora resume el modelo según cuánto acertó en O'Higgins desde 2025; con chubascos de tormenta acierta menos.";
 
 const deg = (c: number) => `${Math.round(c)}°`;
 const kmh = (v: number) => `${Math.round(v)} km/h`;
@@ -45,6 +46,7 @@ export function WeatherLine({ lat, lon, refreshKey }: Props) {
       <span>
         viento {kmh(w.windKmh)} {w.windFrom}
       </span>
+      {w.rainChance !== null && <span>{rainOutlook(w.rainChance)} la próxima hora</span>}
       <span className="text-xs text-muted">modelo Open-Meteo</span>
     </p>
   );
@@ -75,6 +77,12 @@ export function WeatherDetails({ lat, lon, town, refreshKey }: Props) {
           </div>
         ))}
       </dl>
+      {w.rainChance !== null && (
+        <p className="text-sm">
+          <span className="text-muted">Próxima hora: </span>
+          <span className="font-semibold">{rainOutlook(w.rainChance)}</span>
+        </p>
+      )}
       <p className="text-[11px] leading-snug text-muted">{SOURCE}</p>
     </section>
   );
