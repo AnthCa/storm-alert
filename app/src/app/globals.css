@@ -125,3 +125,34 @@ body {
   .mn-sweep, .mn-pulse, .mn-scan, .mn-ring, .mn-ticker, .mn-in { animation: none; }
   .mn-blip { animation: none; opacity: 0.8; }
 }
+
+/* Page change: opacity only, so the wrapper never becomes a containing block for fixed layers. */
+.page-enter {
+  animation: page-enter 0.24s ease-out;
+}
+
+@keyframes page-enter {
+  from {
+    opacity: 0;
+  }
+}
+
+/* "Ver detalles": the grid row grows from 0fr to 1fr, which animates to the content's real height. */
+.collapsible {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition:
+    grid-template-rows 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.2s ease-out;
+}
+
+.collapsible[data-open="true"] {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+
+.collapsible > * {
+  min-height: 0;
+  overflow: hidden;
+}

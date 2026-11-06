@@ -214,21 +214,23 @@ export function HomeView() {
         {wide && status && <SavedPlacesTable status={status} />}
         {wide && status && <CloudTrend status={status} />}
         <Legend allClouds={allClouds} onToggleClouds={() => setAllClouds(!allClouds)} />
-        {detailed && (
-          <div id="storm-details" className="flex flex-col gap-3">
-            <p className="text-[13px] text-soft">
-              Colores de las nubes: más fría = más alta = tormenta más intensa. Naranja desde −38 °C (nube de
-              tormenta), rojo desde −44 °C, rojo oscuro bajo −50 °C y magenta en los topes más fríos. En gris, el resto de las nubes: más blancas mientras más altas. Datos de nubes de las{" "}
-              {status ? localTime(status.latest_scan_utc) : "—"} y de rayos hasta las{" "}
-              {status ? localTime(status.data_until_utc) : "—"}.
-            </p>
-            {weather && !wide && <WeatherDetails {...weather} />}
-            {status && !wide && (
-              <Stats status={status} activity={activity} current={state === "healthy" || state === "degraded"} />
-            )}
-            {status && state === "healthy" && <ShareStatus status={status} />}
+        <div id="storm-details" className="collapsible -mt-2.5 lg:-mt-5" data-open={detailed} inert={!detailed}>
+          <div>
+            <div className="flex flex-col gap-3 pt-2.5 lg:pt-5">
+              <p className="text-[13px] text-soft">
+                Colores de las nubes: más fría = más alta = tormenta más intensa. Naranja desde −38 °C (nube de
+                tormenta), rojo desde −44 °C, rojo oscuro bajo −50 °C y magenta en los topes más fríos. En gris, el resto de las nubes: más blancas mientras más altas. Datos de nubes de las{" "}
+                {status ? localTime(status.latest_scan_utc) : "—"} y de rayos hasta las{" "}
+                {status ? localTime(status.data_until_utc) : "—"}.
+              </p>
+              {weather && !wide && <WeatherDetails {...weather} />}
+              {status && !wide && (
+                <Stats status={status} activity={activity} current={state === "healthy" || state === "degraded"} />
+              )}
+              {status && state === "healthy" && <ShareStatus status={status} />}
+            </div>
           </div>
-        )}
+        </div>
         {wide ? (
           <p className="text-xs leading-relaxed text-muted">
             Observación experimental. No reemplaza los avisos de SENAPRED ni de la Dirección Meteorológica.
@@ -242,7 +244,7 @@ export function HomeView() {
             className="flex min-h-9 items-center justify-center gap-1 text-[13px] font-semibold text-quiet"
           >
             {expanded ? "Ocultar detalles" : "Ver detalles"}
-            <ChevronRightIcon size={14} className={expanded ? "-rotate-90" : "rotate-90"} />
+            <ChevronRightIcon size={14} className={`transition-transform duration-300 ${expanded ? "-rotate-90" : "rotate-90"}`} />
           </button>
         )}
       </section>
