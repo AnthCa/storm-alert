@@ -109,7 +109,7 @@ export function HomeView() {
   return (
     <main className="relative h-dvh overflow-hidden lg:flex lg:pt-16">
       <h1 className="sr-only">Miranubes: tormentas y rayos en vivo sobre O&apos;Higgins</h1>
-      <div className="absolute inset-x-0 top-0 bottom-18 lg:relative lg:inset-auto lg:flex lg:min-w-0 lg:grow lg:flex-col">
+      <div className="absolute inset-x-0 top-0 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] lg:relative lg:inset-auto lg:flex lg:min-w-0 lg:grow lg:flex-col">
         <div className="relative size-full lg:min-h-0 lg:grow">
           {mapReady && (
             <StormMap
@@ -147,7 +147,7 @@ export function HomeView() {
 
       <section
         id="storm-summary"
-        className="absolute inset-x-0 bottom-18 z-10 flex flex-col gap-2.5 rounded-t-[22px] border-t border-line bg-surface px-4 pt-1 pb-3 lg:static lg:w-[380px] lg:shrink-0 xl:w-[420px] lg:gap-5 lg:overflow-y-auto lg:rounded-none lg:border-t-0 lg:border-l lg:bg-bg lg:p-5"
+        className="absolute inset-x-0 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-10 flex flex-col gap-2.5 rounded-t-[22px] border-t border-line bg-surface px-4 pt-1 pb-3 lg:static lg:w-[380px] lg:shrink-0 xl:w-[420px] lg:gap-5 lg:overflow-y-auto lg:rounded-none lg:border-t-0 lg:border-l lg:bg-bg lg:p-5"
         aria-label="Actividad en tu ubicación"
         aria-live="polite"
       >
@@ -216,7 +216,8 @@ export function HomeView() {
         <Legend allClouds={allClouds} onToggleClouds={() => setAllClouds(!allClouds)} />
         <div id="storm-details" className="collapsible -mt-2.5 lg:-mt-5" data-open={detailed} inert={!detailed}>
           <div>
-            <div className="flex flex-col gap-3 pt-2.5 lg:pt-5">
+            {/* Capped on phones so the sheet never grows past the screen and hides its own close button. */}
+            <div className="flex max-h-[40dvh] flex-col gap-3 overflow-y-auto overscroll-contain pt-2.5 lg:max-h-none lg:overflow-visible lg:pt-5">
               <p className="text-[13px] text-soft">
                 Colores de las nubes: más fría = más alta = tormenta más intensa. Naranja desde −38 °C (nube de
                 tormenta), rojo desde −44 °C, rojo oscuro bajo −50 °C y magenta en los topes más fríos. En gris, el resto de las nubes: más blancas mientras más altas. Datos de nubes de las{" "}

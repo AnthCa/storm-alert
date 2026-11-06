@@ -3,6 +3,7 @@ import type { Metadata, Viewport } from "next";
 import { IBM_Plex_Mono, IBM_Plex_Sans, Space_Grotesk } from "next/font/google";
 import { BottomNav } from "@/components/BottomNav";
 import { ServiceWorker } from "@/components/ServiceWorker";
+import { StandaloneViewport } from "@/components/StandaloneViewport";
 import { StatusProvider } from "@/components/StatusProvider";
 import { TitleBadge } from "@/components/TitleBadge";
 import { APP_URL } from "@/lib/share";
@@ -80,6 +81,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           <TitleBadge />
         </StatusProvider>
         <ServiceWorker />
+        <StandaloneViewport />
         {/* Cookieless page-view counts; no location or personal data. */}
         <Analytics />
       </body>
