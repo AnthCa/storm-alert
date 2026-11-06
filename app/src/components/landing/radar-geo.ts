@@ -49,18 +49,18 @@ export function verdictAt(status: Status, lat: number, lon: number): Verdict {
       : { title: "Sin nubes de tormenta cerca", advice: "Estás fuera del área de alerta.", tone: "soft" };
   }
   if (level === "over" && flashesNear > 0) {
-    return { title: "Actividad sobre tu zona", advice: "Hay rayos muy cerca. Entra a un lugar cerrado.", tone: "severe" };
+    return { title: "Tormenta con rayos sobre tu zona", advice: "Entra a un lugar cerrado.", tone: "severe" };
   }
   if ((level === "over" || level === "near") && nearest && !lightningWithin(status, lat, lon, AROUND_KM)) {
     return {
       title: level === "over" ? "Nubes muy frías sobre tu zona" : `Nubes muy frías a ${Math.round(nearest.km)} km al ${nearest.direction}`,
-      advice: "Sin rayos por ahora: pueden ser solo nubes altas o traer lluvia.",
+      advice: "Sin rayos: puede llover o no. Si aparecen rayos, este aviso cambia.",
       tone: "convective",
     };
   }
   if ((level === "over" || level === "near") && nearest) {
     return {
-      title: `Actividad a ${Math.round(nearest.km)} km al ${nearest.direction}`,
+      title: `Tormenta con rayos a ${Math.round(nearest.km)} km al ${nearest.direction}`,
       advice:
         status.level === "severe"
           ? "Se está intensificando. Si estás al aire libre, busca refugio."

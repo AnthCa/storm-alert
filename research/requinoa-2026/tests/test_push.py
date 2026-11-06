@@ -37,7 +37,7 @@ def test_storm_within_radius():
     notification = choose(RANCAGUA, status(cold_pixels=COLD_SOUTH), NOW)
     assert notification.kind == "storm"
     assert notification.title == "Nubes muy frías a 12 km al sur"
-    assert "Sin rayos por ahora" in notification.body
+    assert "Sin rayos: puede llover o no" in notification.body
     assert "no es un aviso oficial" in notification.body
 
 
@@ -45,7 +45,7 @@ def test_storm_is_called_a_storm_only_with_lightning_in_the_radius():
     old_flash = [[-34.3, -70.74, 25.0]]  # ~14 km south, 25 min ago: too old for a lightning notice
     notification = choose(RANCAGUA, status(cold_pixels=COLD_SOUTH, flash_cells_30min=old_flash), NOW)
     assert notification.kind == "storm"
-    assert notification.title == "Nubes de tormenta con rayos a 12 km al sur"
+    assert notification.title == "Tormenta con rayos a 12 km al sur"
 
 
 def test_one_or_two_flickering_pixels_are_not_a_storm():

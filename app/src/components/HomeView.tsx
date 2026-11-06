@@ -78,9 +78,21 @@ export function HomeView() {
   const activity = status && place ? activityAt(status, place.lat, place.lon) : null;
   const frames = status && state !== "historical" ? replayFrames(status) : [];
   // Current conditions only make sense for live data at a chosen place.
+  const stormWithLightning =
+    !!activity &&
+    (activity.level === "over" || activity.level === "near") &&
+    !!place &&
+    !!status &&
+    lightningWithin(status, place.lat, place.lon, AROUND_KM);
   const weather =
     place && status && !demo && state !== "historical"
-      ? { lat: place.lat, lon: place.lon, town: nearestTown(place.lat, place.lon), refreshKey: status.data_until_utc }
+      ? {
+          lat: place.lat,
+          lon: place.lon,
+          town: nearestTown(place.lat, place.lon),
+          refreshKey: status.data_until_utc,
+          hideRain: stormWithLightning,
+        }
       : null;
 
   async function handleLocate() {
@@ -364,7 +376,7 @@ function StateBanner(props: {
       : status.level === "quiet"
         ? "Área de alerta: sin actividad ahora"
         : areaLightning
-          ? "Área de alerta: nubes de tormenta con rayos"
+          ? "Área de alerta: tormenta con rayos"
           : "Área de alerta: nubes muy frías, sin rayos";
     return (
       <CompactBanner tone={status.level === "quiet" && !warmLightning ? "quiet" : "convective"} title={title} />
@@ -372,12 +384,12 @@ function StateBanner(props: {
   }
   if (status.level === "deep_convection") {
     return areaLightning ? (
-      <Banner tone="convective" title="Nubes de tormenta con rayos en el área monitoreada">
+      <Banner tone="convective" title="Tormenta con rayos en el área monitoreada">
         Hubo rayos en la última media hora. Sin actividad intensa observada.{partial}
       </Banner>
     ) : (
       <Banner tone="convective" title="Nubes muy frías en el área monitoreada">
-        Sin rayos por ahora: pueden ser solo nubes altas o traer lluvia. Sin actividad intensa observada.{partial}
+        Sin rayos: puede llover o no. Sin actividad intensa observada.{partial}
       </Banner>
     );
   }
@@ -511,6 +523,8 @@ function PlaceSummary(props: {
   let advice: string;
   let context: string | null = null;
   let tone: string;
+  // How often it rained under the same signal (scoring s2): set only where it applies.
+  let rain: "alta" | "media" | null = null;
 
   if (level === "outside" && observed) {
     title = storm ? `Nubes de tormenta a ${Math.round(storm.km)} km` : "Sin nubes de tormenta cerca";
@@ -524,23 +538,26 @@ function PlaceSummary(props: {
     advice = `Por ahora solo observamos la zona de O'Higgins y alertamos ${status.radius_km} km alrededor de Requínoa. Revisa los avisos oficiales para tu zona.`;
     tone = "text-soft";
   } else if (level === "over" && activity.flashesNear > 0) {
-    title = "Actividad sobre tu zona";
-    advice = "Hay rayos muy cerca. Entra a un lugar cerrado.";
+    title = "Tormenta con rayos sobre tu zona";
+    advice = "Entra a un lugar cerrado.";
     tone = "text-severe";
+    rain = "alta";
   } else if ((level === "over" || level === "near") && nearest && !lightningWithin(status, place.lat, place.lon, AROUND_KM)) {
     // Cold tops without a single flash nearby: often just a grey sky of high cloud.
     title = level === "over" ? "Nubes muy frías sobre tu zona" : `Nubes muy frías a ${Math.round(nearest.km)} km al ${nearest.direction}`;
-    advice = ["Sin rayos por ahora: pueden ser solo nubes altas o traer lluvia.", level === "near" ? movement : null]
+    advice = ["Sin rayos: puede llover o no. Si aparecen rayos, este aviso cambia.", level === "near" ? movement : null]
       .filter(Boolean)
       .join(" ");
-    tone = "text-convective";
+    tone = "text-convective-soft";
+    rain = "media";
   } else if ((level === "over" || level === "near") && nearest) {
-    title = `Actividad a ${Math.round(nearest.km)} km al ${nearest.direction}`;
+    title = `Tormenta con rayos a ${Math.round(nearest.km)} km al ${nearest.direction}`;
     advice =
       status.level === "severe"
         ? "Se está intensificando. Si estás al aire libre, busca refugio."
         : (movement ?? "Hubo rayos en la última media hora. Mantente atento por si se acerca.");
     tone = status.level === "severe" ? "text-severe" : "text-convective";
+    rain = "alta";
   } else if (state === "healthy" && flash) {
     // No flash in the last 10 minutes, but one within the safety distance in the last 30.
     title = "Rayos recientes cerca de ti";
@@ -580,9 +597,37 @@ function PlaceSummary(props: {
         </p>
       )}
       <p className="text-sm text-soft">{advice}</p>
+      {rain && current && <RainLikelihood level={rain} detailed={detailed} />}
       {context && current && (detailed || level !== "outside") && <p className="text-[13px] text-soft">{context}</p>}
       {!current && (level !== "outside" || observed) && (
         <p className="text-[13px] text-muted">Según datos de las {localTime(status.data_until_utc)}.</p>
+      )}
+    </div>
+  );
+}
+
+/**
+ * How often it really rained under this signal, scored against NASA IMERG on 572 days
+ * (research scoring s2): 83-88 % with lightning under cold tops, 43-50 % without.
+ */
+function RainLikelihood({ level, detailed }: { level: "alta" | "media"; detailed: boolean }) {
+  const high = level === "alta";
+  return (
+    <div className="mt-1 flex flex-col gap-1">
+      <span
+        className={`self-start rounded-full border px-2 py-0.5 text-[11px] font-bold tracking-wide ${high ? "border-[#7a2a22] bg-severe-bg text-[#ffb4a8]" : "border-line bg-surface-2 text-soft"}`}
+      >
+        PROBABILIDAD {high ? "ALTA" : "MEDIA"} DE LLUVIA
+      </span>
+      {detailed && (
+        <p className="text-[13px] text-soft">
+          {high
+            ? "Con rayos bajo nubes así, llovió en 8 de cada 10 casos medidos."
+            : "Con nubes así pero sin rayos, llovió cerca de la mitad de las veces."}{" "}
+          <Link href="/como-funciona#confiable" className="font-semibold text-quiet">
+            ¿Cómo lo medimos?
+          </Link>
+        </p>
       )}
     </div>
   );

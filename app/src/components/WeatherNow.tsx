@@ -33,10 +33,12 @@ interface Props {
   town: string | null;
   /** Changes with each new status, so the conditions refresh alongside the map. */
   refreshKey: string;
+  /** A storm with lightning is overhead or near: what the satellite sees beats the model's rain forecast. */
+  hideRain?: boolean;
 }
 
 /** One line under the storm answer: the basics, always visible on a phone. */
-export function WeatherLine({ lat, lon, refreshKey }: Props) {
+export function WeatherLine({ lat, lon, refreshKey, hideRain }: Props) {
   const w = useWeather(lat, lon, refreshKey);
   if (!w) return null;
   return (
@@ -46,14 +48,14 @@ export function WeatherLine({ lat, lon, refreshKey }: Props) {
       <span>
         viento {kmh(w.windKmh)} {w.windFrom}
       </span>
-      {w.rainChance !== null && <span>{rainOutlook(w.rainChance)} la próxima hora</span>}
+      {w.rainChance !== null && !hideRain && <span>{rainOutlook(w.rainChance)} la próxima hora</span>}
       <span className="text-xs text-muted">modelo Open-Meteo</span>
     </p>
   );
 }
 
 /** The full block inside "Ver detalles" and on the desktop panel. */
-export function WeatherDetails({ lat, lon, town, refreshKey }: Props) {
+export function WeatherDetails({ lat, lon, town, refreshKey, hideRain }: Props) {
   const w = useWeather(lat, lon, refreshKey);
   if (!w) return null;
   const items: [string, string][] = [
@@ -77,7 +79,7 @@ export function WeatherDetails({ lat, lon, town, refreshKey }: Props) {
           </div>
         ))}
       </dl>
-      {w.rainChance !== null && (
+      {w.rainChance !== null && !hideRain && (
         <p className="text-sm">
           <span className="text-muted">Próxima hora: </span>
           <span className="font-semibold">{rainOutlook(w.rainChance)}</span>

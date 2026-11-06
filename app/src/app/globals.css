@@ -13,6 +13,7 @@
   --color-quiet-bg: #12283d;
   --color-quiet-line: #24486b;
   --color-convective: #f2a53a;
+  --color-convective-soft: #d9b06b; /* cold tops without lightning: rain about half the time */
   --color-severe: #ff8a7a;
   --color-severe-strong: #c73a2c;
   --color-severe-bg: #3a1512;

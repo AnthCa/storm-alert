@@ -116,13 +116,13 @@ def choose(sub: dict, status: dict, now: datetime) -> Notification | None:
         if any(float(distance_km(lat, lon, f[0], f[1])) <= radius for f in flashes):
             return Notification(
                 "storm",
-                f"Nubes de tormenta con rayos {where}",
-                f"Hubo rayos dentro de tus {radius} km en la última media hora. {note}",
+                f"Tormenta con rayos {where}",
+                f"Hubo rayos dentro de tus {radius} km en la última media hora. Probabilidad alta de lluvia. {note}",
             )
         return Notification(
             "storm",
             f"Nubes muy frías {where}",
-            f"Sin rayos por ahora: pueden ser solo nubes altas o traer lluvia. Si cae un rayo a menos de "
+            f"Sin rayos: puede llover o no. Si cae un rayo a menos de "
             f"{LIGHTNING_KM} km te avisamos. {note}",
         )
     return None

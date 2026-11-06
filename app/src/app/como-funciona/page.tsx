@@ -54,6 +54,28 @@ const STATS = [
   { value: "2", label: "días con granizo confirmado en Rancagua" },
 ];
 
+// Scoring s2 (research): share of half-hours with >= 1 mm/h of IMERG rain under each signal.
+const RAIN_UNDER = [
+  {
+    label: "Nubes muy frías con rayos",
+    value: "8 de 10",
+    unit: "veces llovió",
+    range: "Llovió entre 83 y 88 de cada 100 veces",
+    width: "85%",
+    color: "text-severe",
+    bar: "bg-severe",
+  },
+  {
+    label: "Nubes muy frías sin rayos",
+    value: "5 de 10",
+    unit: "veces llovió, más o menos",
+    range: "Llovió entre 43 y 50 de cada 100 veces",
+    width: "47%",
+    color: "text-convective-soft",
+    bar: "bg-convective-soft",
+  },
+];
+
 export default function HowItWorksPage() {
   return (
     <PageShell
@@ -142,6 +164,28 @@ export default function HowItWorksPage() {
       <p className="-mt-3 text-[13px] leading-relaxed text-muted">
         Es un solo tornado y un solo mes. No alcanza para estimar con qué frecuencia acierta o se equivoca.
       </p>
+
+      <section id="confiable" className="flex scroll-mt-20 flex-col gap-3">
+        <h2 className="text-lg font-semibold">¿Qué tan confiable es un aviso?</h2>
+        <p className="text-sm leading-relaxed text-soft">
+          Comparamos cada aviso con la lluvia que de verdad cayó, medida por la NASA desde el espacio.
+        </p>
+        {RAIN_UNDER.map((row) => (
+          <Card key={row.label} className="gap-2 p-3.5">
+            <span className="text-sm font-semibold">{row.label}</span>
+            <span className="text-[13px] text-soft">
+              <span className={`font-mono text-2xl ${row.color}`}>{row.value}</span> {row.unit}
+            </span>
+            <div role="img" aria-label={row.range} className="h-2.5 rounded-full bg-surface-2">
+              <div className={`h-full rounded-full ${row.bar}`} style={{ width: row.width }} />
+            </div>
+          </Card>
+        ))}
+        <p className="text-[13px] leading-relaxed text-muted">
+          Medido en 572 días, de abril de 2025 a octubre de 2026, en toda la región. Se equivoca más en el valle en
+          invierno, y la NASA estima la lluvia desde el satélite: los números son aproximados.
+        </p>
+      </section>
 
       <section className="flex flex-col gap-2">
         <h2 className="text-lg font-semibold">Cobertura y versión</h2>
