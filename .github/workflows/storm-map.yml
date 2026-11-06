@@ -17,7 +17,7 @@ concurrency:
 jobs:
   update:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 12
     environment:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}
@@ -71,7 +71,9 @@ jobs:
             });
             core.setOutput("page_url", data.page_url);
             const deployment = { owner, repo, id: data.id };
-            for (let i = 0; i < 36; i++) {
+            // Pages can sit in "deployment_queued" for several minutes (2026-11-06: over 3);
+            // wait up to 7 like actions/deploy-pages (10), within the job's 12-minute limit.
+            for (let i = 0; i < 84; i++) {
               await new Promise((done) => setTimeout(done, 5000));
               const { data: state } = await github.request("GET /repos/{owner}/{repo}/pages/deployments/{id}", deployment);
               core.info(`Pages deployment ${version}: ${state.status}`);
