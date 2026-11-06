@@ -150,6 +150,34 @@ rain of 1 mm/h, the false notices seen from the ground on 2026-11-02. The coast 
 worst. Most of the sample is winter frontal rain, not summer convection, and the warm
 season is one month: its intervals are wide. Full table: `data/results/score_s1_held-out.csv`.
 
+## Frozen on 2026-11-06 (scoring s2: cold tops and lightning)
+
+Fixed before any result was seen; see `score_lightning.py` for the exact rules.
+
+- Same zones, truth, units, metrics and dev / held-out split as s1.
+- Detection: cloud top <= −38 °C AND at least 1 GLM flash in the same zone and half-hour.
+- Lightning counts only when >= 60 of the half-hour's 90 GLM files were read; cold units
+  without it are dropped from both detectors, so s1 and s2 share every unit.
+- Reported: s1, s2 and the difference s2 − s1, each with day-block 95% intervals.
+
+## Results: scoring s2 (run 2026-11-06)
+
+Same units for both detectors (s1 POD on held-out reproduces the published 0.84).
+
+| Set | Truth | s1 cold tops: POD / FAR / CSI | s2 cold tops + lightning: POD / FAR / CSI |
+|---|---|---|---|
+| dev (359 days) | ≥ 1 mm/h | 0.58 / 0.48 / 0.38 | 0.03 / 0.12 / 0.03 |
+| held-out (213 days) | ≥ 1 mm/h | 0.83 / 0.54 / 0.42 | 0.10 / 0.17 / 0.10 |
+| held-out | ≥ 5 mm/h | 0.95 / 0.79 / 0.21 | 0.14 / 0.34 / 0.13 |
+
+Reading: lightning must not gate the storm notice. Most rain in O'Higgins falls without
+lightning (frontal rain), so requiring a flash misses 9 of 10 rainy half-hours. But
+when there IS lightning under a cold top, rain follows far more often: FAR drops from
+0.54 to 0.17 (held-out, 95% range of the drop 0.31–0.44). Use: keep cold tops as the
+detector and treat lightning as the confidence level ("storm with lightning" is the
+reliable statement; "cold clouds without lightning" may or may not rain). The valley in
+the cold season is the exception (FAR 0.36 with lightning). Files: `score_s2_*`.
+
 ## Frozen on 2026-11-05 (rain chance r1)
 
 Fixed before any result was seen; see `rain_chance.py` for the exact rules.
