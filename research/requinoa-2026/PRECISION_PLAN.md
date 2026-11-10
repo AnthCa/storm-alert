@@ -240,6 +240,39 @@ grey all-clouds layer still shows it). Remaining jumps are cells forming and dyi
 Persistence across scans and per-cell tracking are still to do. The alert rule is
 unchanged: it reads the coldest top within 50 km.
 
+## Frozen on 2026-11-10 (storm outlook t1: "lightning possible today")
+
+Fixed before any result was seen; see `storm_outlook.py` for the exact rules.
+
+- Forecast issued one day earlier (Open-Meteo Previous Runs API, `*_previous_day1`) at
+  the 22 app towns: a thunderstorm weather code in some hour of the local day, or the
+  day's highest CAPE over a threshold fitted on the dev set (best CSI: 200 J/kg).
+- Truth: at least one GLM flash that local day within the 3 x 3 block of 0.1° cells
+  around the town; "region" = any town. Same dev / held-out split as s1.
+
+## Results: storm outlook t1 (run 2026-11-10)
+
+| Set | Unit | Forecast | Days with lightning | POD | FAR | CSI |
+|---|---|---|---|---|---|---|
+| dev (359 days) | region | thunderstorm code | 17 | 0.29 | 0.62 | 0.20 |
+| dev | region | CAPE ≥ 200 | 17 | 0.47 | 0.73 | 0.21 |
+| held-out (213 days) | region | thunderstorm code | 37 | 0.00 | – | 0.00 |
+| held-out | region | CAPE ≥ 200 | 37 | 0.68 (0.53–0.81) | 0.55 (0.42–0.67) | 0.37 (0.26–0.49) |
+| held-out, October (30 days) | region | CAPE ≥ 200 | 14 | 0.93 | 0.54 | 0.45 |
+| held-out | town | CAPE ≥ 200 | – | 0.75 | 0.80 | 0.19 |
+
+Reading: not good enough to show in the app. The day-ahead thunderstorm code was never
+issued on any held-out day (and on no warm-season day of the dev year), so it missed
+every storm, the Requínoa tornado included: do not rely on it. CAPE over 200 J/kg
+caught two of three lightning days in the region, but more than half of its "possible"
+days had no lightning, and in October 2026 it said "possible" on 28 of 30 days, which
+tells a reader nothing. Per town, four of five notices would be wrong. A useful outlook
+needs more than CAPE (shear, moisture, a trigger) or the DMC's own notices; until one
+scores better, the app keeps pointing to the official forecast.
+Limits: flashes under tops warmer than -38 °C are not in the lightning grid; lightning
+days differ a lot between the two sets (17 in 359 days, 37 in 213).
+Files: `data/results/storm_outlook_t1_*`.
+
 ## Reliability section in the app
 
 Published at the end of Phase A, and never before: no estimated or placeholder numbers.
