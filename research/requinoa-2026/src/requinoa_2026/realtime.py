@@ -36,7 +36,7 @@ CYCLE_S = 600
 
 SCHEMA_VERSION = 5
 # Bump whenever the alert rule or its thresholds change (see false_alarms.py).
-ALGORITHM_VERSION = "2026.11-r1"
+ALGORITHM_VERSION = "2026.11-r2"
 
 GLM_FILE_S = 20  # one GLM L2 file every 20 s
 ABI_SCAN = pd.Timedelta("10min")  # full disk every 10 min

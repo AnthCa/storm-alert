@@ -212,6 +212,23 @@ rain) but the table moves from one year to the next: one dev year is not enough 
 exact percentages. IMERG misses some light rain, so part of the gap may be the truth
 source; rain gauges (INIA, DMC) are needed to confirm. Files: `data/results/rain_chance_r1_*`.
 
+## Algorithm 2026.11-r2 (2026-11-10): minimum rise for a lightning jump
+
+Not a scored change: a defect fix. After a quiet spell the previous changes in flash rate
+are all zero, so the "2 sigma" threshold was zero and any 5 flashes in 5 minutes counted
+as a jump. On 2026-11-10 an ordinary night thunderstorm (92 flashes in three hours, peak
+10 per 5 minutes, light rain) was reported as intensifying three times. A jump now also
+needs a rise of at least 1 flash per minute between bins.
+
+Effect on the days at hand (October 2026 afternoons and 10 Nov), episodes per day:
+7 Oct 1 → 0, 8 Oct 3 → 2, 10 Nov 1 → 0 (as replayed over 02–07 UTC); 13, 18, 20, 24 and
+26 Oct unchanged, the tornado day still alerting at 19:40 UTC.
+
+Limit: the floor was picked on the same days the rule was first tried on, and none of
+them except 26 Oct has a severe report to compare with. The severe level stays
+unvalidated until it is scored against a list of severe events (hail, wind damage)
+from regional media, on the dev / held-out split.
+
 ## Reliability section in the app
 
 Published at the end of Phase A, and never before: no estimated or placeholder numbers.

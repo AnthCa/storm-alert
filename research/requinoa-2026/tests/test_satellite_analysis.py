@@ -20,6 +20,18 @@ def test_no_jump_at_negligible_rates():
     assert not lightning_jumps(counts).any()
 
 
+def test_a_handful_of_flashes_after_a_quiet_spell_is_not_a_jump():
+    # 10 Nov 2026: an ordinary thunderstorm; zero history made any rise pass "2 sigma".
+    counts = pd.Series([0, 0, 0, 2, 1, 2, 5, 6, 5, 8])
+    assert not lightning_jumps(counts).any()
+
+
+def test_a_strong_rise_after_a_quiet_spell_is_a_jump():
+    # 26 Oct 2026, the bins before the Requínoa tornado.
+    counts = pd.Series([0, 0, 0, 0, 0, 0, 6, 20, 25, 46])
+    assert lightning_jumps(counts).tolist() == [False] * 6 + [True, True, False, True]
+
+
 def test_no_parallax_below_the_satellite():
     lat, lon = parallax_correct(0.0, GOES19_LON)
     assert abs(lat) < 1e-9 and abs(lon - GOES19_LON) < 1e-9
