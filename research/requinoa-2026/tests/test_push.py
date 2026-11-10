@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
 
-from requinoa_2026.push import choose, direction, mark, payload, plan
+from requinoa_2026.push import choose, direction, ended_quietly, mark, payload, plan
 
 NOW = datetime(2026, 10, 26, 20, 32, tzinfo=timezone.utc)
 RANCAGUA = {"id": 1, "lat": -34.17, "lon": -70.74, "radius_km": 25, "last_notified": {}}
@@ -57,18 +57,92 @@ def test_storm_outside_radius_is_ignored():
     assert choose(RANCAGUA, status(cold_pixels=far), NOW) is None
 
 
-def test_storm_waits_an_hour_between_notifications():
-    recent = {**RANCAGUA, "last_notified": {"storm": (NOW - timedelta(minutes=40)).isoformat()}}
+def told(place: dict, notification, state: dict, at: datetime = NOW) -> dict:
+    """The place after it was sent `notification`."""
+    return {**place, "last_notified": mark(place["last_notified"], notification, state, at)}
+
+
+def test_cold_cloud_that_stays_is_told_once():
+    cold = status(cold_pixels=COLD_SOUTH)
+    after = told(RANCAGUA, choose(RANCAGUA, cold, NOW), cold)
+    assert choose(after, cold, NOW) is None
+    later = NOW + timedelta(hours=3)
+    assert choose(after, status(cold_pixels=COLD_SOUTH, data_until_utc=later.isoformat()), later) is None
+
+
+def test_a_new_cold_episode_waits_an_hour_after_the_last_one():
+    recent = {**RANCAGUA, "last_notified": {"storm": (NOW - timedelta(minutes=40)).isoformat(), "open": None}}
     assert choose(recent, status(cold_pixels=COLD_SOUTH), NOW) is None
-    old = {**RANCAGUA, "last_notified": {"storm": (NOW - timedelta(minutes=70)).isoformat()}}
+    old = {**RANCAGUA, "last_notified": {"storm": (NOW - timedelta(minutes=70)).isoformat(), "open": None}}
     assert choose(old, status(cold_pixels=COLD_SOUTH), NOW).kind == "storm"
 
 
+def test_cold_cloud_is_told_again_once_when_lightning_joins_it():
+    cold = status(cold_pixels=COLD_SOUTH)
+    after_cold = told(RANCAGUA, choose(RANCAGUA, cold, NOW), cold)
+    with_flash = status(cold_pixels=COLD_SOUTH, flash_cells_30min=[[-34.3, -70.74, 25.0]])
+    upgrade = choose(after_cold, with_flash, NOW)
+    assert upgrade.title == "Tormenta con rayos a 12 km al sur"
+    assert choose(told(after_cold, upgrade, with_flash), with_flash, NOW) is None
+
+
+def test_cold_episode_ends_quietly_when_the_cloud_is_gone():
+    cold = status(cold_pixels=COLD_SOUTH)
+    after = told(RANCAGUA, choose(RANCAGUA, cold, NOW), cold)
+    assert not ended_quietly(after, cold)
+    assert ended_quietly(after, status())
+    assert choose(after, status(), NOW) is None  # nothing to say: there was no lightning
+    assert not ended_quietly(after, status(health={"state": "degraded"}))
+    assert not ended_quietly(RANCAGUA, status())
+
+
+CLOSE_FLASH = [[-34.25, -70.74, 4.0]]  # ~9 km south, 4 min before 20:30 UTC
+
+
+def test_lightning_that_goes_on_is_repeated_hourly_at_most():
+    state = status(flash_cells_30min=CLOSE_FLASH)
+    after = told(RANCAGUA, choose(RANCAGUA, state, NOW), state)
+    assert choose(after, state, NOW + timedelta(minutes=20)) is None
+    later = NOW + timedelta(minutes=61)
+    again = status(flash_cells_30min=CLOSE_FLASH, data_until_utc=later.isoformat())
+    assert choose(after, again, later).kind == "lightning"
+
+
+def test_all_clear_after_thirty_minutes_without_flashes_in_reach():
+    state = status(flash_cells_30min=CLOSE_FLASH)
+    after = told(RANCAGUA, choose(RANCAGUA, state, NOW), state)
+    # A flash 20 km away is inside the 25 km radius: not clear yet.
+    assert choose(after, status(flash_cells_30min=[[-34.35, -70.74, 28.0]]), NOW) is None
+    clear = choose(after, status(), NOW)
+    assert (clear.kind, clear.title) == ("clear", "Ya no hay rayos cerca")
+    assert "30 minutos sin rayos a menos de 25 km" in clear.body
+    assert choose(told(after, clear, status()), status(), NOW) is None
+
+
+def test_no_all_clear_on_incomplete_lightning_data():
+    state = status(flash_cells_30min=CLOSE_FLASH)
+    after = told(RANCAGUA, choose(RANCAGUA, state, NOW), state)
+    assert choose(after, status(health={"state": "degraded"}), NOW) is None
+
+
+def test_no_all_clear_for_cloud_that_never_had_lightning():
+    cold = status(cold_pixels=COLD_SOUTH)
+    after = told(RANCAGUA, choose(RANCAGUA, cold, NOW), cold)
+    assert choose(after, status(), NOW) is None
+
+
+def test_cold_cloud_is_not_news_after_a_lightning_notice():
+    state = status(cold_pixels=COLD_SOUTH, flash_cells_30min=CLOSE_FLASH)
+    after = told(RANCAGUA, choose(RANCAGUA, state, NOW), state)
+    quiet_flash = status(cold_pixels=COLD_SOUTH, flash_cells_30min=[[-34.25, -70.74, 15.0]])
+    assert choose(after, quiet_flash, NOW) is None
+
+
 def test_close_recent_lightning_beats_storm():
-    flashes = [[-34.25, -70.74, 4.0]]  # ~9 km south, 4 min before 20:30 UTC
-    notification = choose(RANCAGUA, status(cold_pixels=COLD_SOUTH, flash_cells_30min=flashes), NOW)
+    notification = choose(RANCAGUA, status(cold_pixels=COLD_SOUTH, flash_cells_30min=CLOSE_FLASH), NOW)
     assert notification.kind == "lightning"
-    assert notification.title == "Rayo a 9 km al sur"
+    assert notification.title == "Rayo a unos 9 km al sur"
+    assert "Detectado a las" in notification.body
     assert "17:26" in notification.body  # 20:26 UTC in Chile
 
 

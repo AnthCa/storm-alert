@@ -151,10 +151,11 @@ export function AlertsSettings() {
               <span>ahora</span>
             </div>
             <div className="text-[15px] font-semibold">
-              Nubes de tormenta con rayos a 12 km al sur de Casa de mis papás
+              Tormenta con rayos a 12 km al sur de Casa de mis papás
             </div>
             <div className="text-sm text-[#2e353d]">
-              Hubo rayos dentro de tus 25 km en la última media hora. Observación experimental, no es un aviso oficial.
+              Hubo rayos cerca en la última media hora. Probabilidad alta de lluvia. Observación experimental, no es
+              un aviso oficial.
             </div>
           </div>
         </div>
@@ -167,12 +168,16 @@ export function AlertsSettings() {
             <strong className="text-fg">Actividad intensa</strong> cerca de Requínoa: una vez por episodio.
           </li>
           <li>
-            <strong className="text-fg">Un rayo a menos de 15 km</strong> de uno de tus lugares: como máximo cada 30
-            minutos.
+            <strong className="text-fg">Un rayo a menos de 15 km</strong> de uno de tus lugares: al primero, y
+            después como máximo una vez por hora mientras siga la tormenta.
           </li>
           <li>
-            <strong className="text-fg">Nubes muy frías dentro de tu radio</strong>: como máximo una vez por hora y
-            lugar. Solo las llamamos tormenta si hay rayos; sin rayos pueden ser solo nubes altas o lluvia.
+            <strong className="text-fg">Nubes muy frías dentro de tu radio</strong>: una vez, y otra si aparecen
+            rayos. Solo las llamamos tormenta si hay rayos; sin rayos pueden ser solo nubes altas o lluvia.
+          </li>
+          <li>
+            <strong className="text-fg">Ya no hay rayos cerca</strong>: cuando pasan 30 minutos sin rayos dentro de
+            tu radio, para que sepas que puedes volver a salir.
           </li>
         </ul>
         <p className="text-[13px] text-muted">
