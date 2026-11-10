@@ -13,6 +13,7 @@ from requinoa_2026.realtime import (
     latest_flash_cells,
     public_level,
     source_health,
+    storm_mask,
 )
 from test_false_alarms import jumping_counts, tops, ts
 
@@ -117,9 +118,21 @@ def abi_scans(temps_c: list[list[float]]) -> xr.Dataset:
 
 
 def test_cold_cells_keep_the_coldest_pixel_per_cell():
-    cells = cold_cells(abi_scans([[-40.0, -45.0, -20.0]]).isel(time=0))
-    assert len(cells) == 1
-    assert cells[0][2] == -45.0
+    cells = cold_cells(abi_scans([[-40.0, -45.0, -39.0]]).isel(time=0))
+    assert sorted(c[2] for c in cells) == [-45.0, -39.0]  # the first two pixels share a cell
+
+
+def test_one_or_two_cold_pixels_are_not_mapped():
+    assert cold_cells(abi_scans([[-40.0, -45.0, -20.0]]).isel(time=0)) == []
+
+
+def test_storm_mask_keeps_groups_of_three_touching_pixels_corners_included():
+    bt = np.full((5, 6), 0.0)
+    bt[0, 0] = bt[1, 1] = bt[2, 2] = -40.0  # diagonal group of three
+    bt[4, 4] = bt[4, 5] = -50.0  # a pair
+    bt[0, 5] = -60.0  # a lone pixel
+    mask = storm_mask(bt)
+    assert mask.sum() == 3 and mask[0, 0] and mask[1, 1] and mask[2, 2]
 
 
 def test_scan_without_cold_tops_has_no_cells():
