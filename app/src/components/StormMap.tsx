@@ -4,11 +4,11 @@ import maplibregl from "@/lib/maplibre";
 import type { GeoJSONSource } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { useEffect, useRef, useSyncExternalStore } from "react";
-import { NEAR_KM, circleRing, nearestStorm } from "@/lib/geo";
+import { NEAR_KM, circleRing, lastFlashNear, nearestStorm } from "@/lib/geo";
 import { useStoredValue } from "@/lib/browser-store";
 import { DEFAULT_BBOX, paintCloudField, paintClouds, type CloudImage } from "@/lib/cloud-image";
 import { PUSH_KEY, isLegacy, type LegacyAlerts, type StoredAlerts } from "@/lib/push-places";
-import type { ReplayFrame } from "@/lib/replay";
+import { FRESH_FLASH_MIN, flashCells, type ReplayFrame } from "@/lib/replay";
 import type { Bbox, Status } from "@/lib/status";
 import type { Place } from "./StatusProvider";
 
@@ -75,10 +75,10 @@ function boxOutline(box: Bbox): Feature {
 /** Live data, or one frame of the replay while it plays. */
 function stormData(status: Status | null, replay: ReplayFrame | null) {
   const cold = replay?.cold ?? status?.cold_pixels ?? [];
-  const flashes = replay?.flashes ?? status?.recent_flashes ?? [];
+  const cells = replay?.cells ?? (status ? flashCells(status) : []);
   return {
     cold,
-    flashes: collection(flashes.map(([lat, lon]) => point(lat, lon))),
+    flashes: collection(cells.map(([lat, lon, age]) => point(lat, lon, { age }))),
     area: collection(status ? [ring(status.center[0], status.center[1], status.radius_km)] : []),
     outside: collection(status ? [outsideMask(status.center[0], status.center[1], status.radius_km)] : []),
     observed: collection(status?.observed_bbox ? [boxOutline(status.observed_bbox)] : []),
@@ -119,7 +119,38 @@ function placeData(status: Status | null, lat: number, lon: number) {
     near: collection([ring(lat, lon, NEAR_KM)]),
     rings: collection([...rings, ...labels]),
     stormLine: collection(line),
+    nearFlash: collection(nearestFlash(status, lat, lon)),
   };
+}
+
+/** The flash the card calls "último rayo", labelled with its distance; only that one, so map and card agree. */
+function nearestFlash(status: Status | null, lat: number, lon: number): Feature[] {
+  const flash = status && lastFlashNear(status, lat, lon);
+  return flash ? [point(flash.lat, flash.lon, { label: `${Math.round(flash.km)} km` })] : [];
+}
+
+/** A lightning bolt, drawn once as a bitmap for the symbol layer. */
+function boltImage(fill: string, size = 48): ImageData {
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = size;
+  const ctx = canvas.getContext("2d")!;
+  const s = size / 24;
+  ctx.beginPath();
+  ctx.moveTo(13 * s, 2 * s);
+  ctx.lineTo(3.5 * s, 14 * s);
+  ctx.lineTo(11 * s, 14 * s);
+  ctx.lineTo(10 * s, 22 * s);
+  ctx.lineTo(20.5 * s, 10 * s);
+  ctx.lineTo(13 * s, 10 * s);
+  ctx.lineTo(15 * s, 2 * s);
+  ctx.closePath();
+  ctx.lineJoin = "round";
+  ctx.strokeStyle = "rgba(14, 17, 22, 0.9)";
+  ctx.lineWidth = 2.5 * s;
+  ctx.stroke();
+  ctx.fillStyle = fill;
+  ctx.fill();
+  return ctx.getImageData(0, 0, size, size);
 }
 
 function markerElement(className: string): HTMLDivElement {
@@ -138,6 +169,8 @@ interface Props {
   replay: ReplayFrame | null;
   /** Draw every cloud in grey under the storm colours. */
   allClouds: boolean;
+  /** Data fresh enough for advice: the card names the last flash only then, so the map labels it only then. */
+  current: boolean;
 }
 
 let webglSupport: boolean | null = null;
@@ -244,7 +277,7 @@ export default function StormMap(props: Props) {
   return <LiveMap {...props} />;
 }
 
-function LiveMap({ status, place, onPick, summaryId, replay, allClouds }: Props) {
+function LiveMap({ status, place, onPick, summaryId, replay, allClouds, current }: Props) {
   const container = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
   const me = useRef<maplibregl.Marker | null>(null);
@@ -261,8 +294,8 @@ function LiveMap({ status, place, onPick, summaryId, replay, allClouds }: Props)
   // The places this phone gets notifications for. Drawn here only: names never leave the phone.
   const [alerts] = useStoredValue<StoredAlerts | LegacyAlerts | null>(PUSH_KEY, null);
   const saved = alerts && !isLegacy(alerts) ? alerts.places : [];
-  const latest = useRef({ status, place, onPick, replay, saved, allClouds });
-  latest.current = { status, place, onPick, replay, saved, allClouds };
+  const latest = useRef({ status, place, onPick, replay, saved, allClouds, current });
+  latest.current = { status, place, onPick, replay, saved, allClouds, current };
 
   useEffect(() => {
     if (!container.current) return;
@@ -284,6 +317,14 @@ function LiveMap({ status, place, onPick, summaryId, replay, allClouds }: Props)
     map.current = m;
 
     m.on("load", () => {
+      // The basemap's grey place names are made for a dark background and vanish over the red
+      // storm colours: brighten them with a dark halo so towns stay readable under a storm.
+      for (const layer of m.getStyle().layers) {
+        if (layer.type !== "symbol" || !layer.layout || !("text-field" in layer.layout)) continue;
+        m.setPaintProperty(layer.id, "text-color", "#DDE5EE");
+        m.setPaintProperty(layer.id, "text-halo-color", "#0e1116");
+        m.setPaintProperty(layer.id, "text-halo-width", 1.6);
+      }
       const data = stormData(latest.current.status, latest.current.replay);
       m.addSource("relief", {
         type: "raster-dem",
@@ -349,9 +390,12 @@ function LiveMap({ status, place, onPick, summaryId, replay, allClouds }: Props)
       m.addSource("area", { type: "geojson", data: data.area });
       m.addSource("observed", { type: "geojson", data: data.observed });
       m.addSource("flashes", { type: "geojson", data: data.flashes });
+      m.addImage("bolt", boltImage("#FFE14D"), { pixelRatio: 2 });
+      m.addImage("bolt-earlier", boltImage("#B9A96A"), { pixelRatio: 2 });
       m.addSource("me-ring", { type: "geojson", data: collection([]) });
       m.addSource("me-rings", { type: "geojson", data: collection([]) });
       m.addSource("storm-line", { type: "geojson", data: collection([]) });
+      m.addSource("near-flash", { type: "geojson", data: collection([]) });
       m.addSource("saved-places", { type: "geojson", data: collection([]) });
 
       m.addLayer({
@@ -420,27 +464,18 @@ function LiveMap({ status, place, onPick, summaryId, replay, allClouds }: Props)
         addColdLayer(m, id, coldCanvas.current[id], box, id === coldFront.current ? 1 : 0);
       }
       m.addLayer({
-        id: "flashes-glow",
-        type: "circle",
-        source: "flashes",
-        paint: {
-          // Faint glows that add up: where flashes crowd, the area brightens as a density.
-          "circle-radius": ["interpolate", ["linear"], ["zoom"], 7, 3, 11, 7],
-          "circle-color": "#FFE14D",
-          "circle-opacity": 0.12,
-          "circle-blur": 1,
-        },
-      });
-      m.addLayer({
         id: "flashes",
-        type: "circle",
+        type: "symbol",
         source: "flashes",
-        paint: {
-          // Small bright dots: hundreds of rings hid the storm under them.
-          "circle-radius": ["interpolate", ["linear"], ["zoom"], 7, 0.9, 11, 1.8],
-          "circle-color": "#FFF6C2",
-          "circle-opacity": 0.8,
+        layout: {
+          // One bolt per ~2 km cell struck in the last 10 minutes: bright when within the last
+          // 5, dimmer before that. Where the bolts are bright, the storm is active now.
+          "icon-image": ["case", ["<=", ["get", "age"], FRESH_FLASH_MIN], "bolt", "bolt-earlier"],
+          "icon-size": ["interpolate", ["linear"], ["zoom"], 7, 0.45, 11, 0.9],
+          "icon-allow-overlap": true,
+          "icon-ignore-placement": true,
         },
+        paint: { "icon-opacity": ["case", ["<=", ["get", "age"], FRESH_FLASH_MIN], 1, 0.7] },
       });
       m.addLayer({
         id: "me-rings",
@@ -471,6 +506,24 @@ function LiveMap({ status, place, onPick, summaryId, replay, allClouds }: Props)
         filter: ["==", ["geometry-type"], "Point"],
         layout: { "text-field": ["get", "label"], "text-font": LABEL_FONT, "text-size": 13 },
         paint: { "text-color": "#FFD08A", "text-halo-color": "#0e1116", "text-halo-width": 2 },
+      });
+      m.addLayer({
+        id: "near-flash",
+        type: "symbol",
+        source: "near-flash",
+        layout: {
+          "icon-image": "bolt",
+          "icon-size": ["interpolate", ["linear"], ["zoom"], 7, 0.8, 11, 1.3],
+          "icon-allow-overlap": true,
+          "icon-ignore-placement": true,
+          "text-field": ["get", "label"],
+          "text-font": LABEL_FONT,
+          "text-size": 12,
+          "text-anchor": "top",
+          "text-offset": [0, 0.9],
+          "text-allow-overlap": true,
+        },
+        paint: { "text-color": "#FFE14D", "text-halo-color": "#0e1116", "text-halo-width": 2 },
       });
       m.addLayer({ id: "me-ring-fill", type: "fill", source: "me-ring", paint: { "fill-color": "#6CB8FF", "fill-opacity": 0.05 } });
       m.addLayer({ id: "me-ring-line", type: "line", source: "me-ring", paint: { "line-color": "#6CB8FF", "line-width": 1, "line-opacity": 0.6 } });
@@ -582,6 +635,9 @@ function LiveMap({ status, place, onPick, summaryId, replay, allClouds }: Props)
     (m.getSource("me-ring") as GeoJSONSource).setData(data.near);
     (m.getSource("me-rings") as GeoJSONSource).setData(data.rings);
     (m.getSource("storm-line") as GeoJSONSource).setData(data.stormLine);
+    // Live and current data only: during a replay it would point at a flash not yet shown.
+    const labelFlash = latest.current.current && !latest.current.replay;
+    (m.getSource("near-flash") as GeoJSONSource).setData(labelFlash ? data.nearFlash : collection([]));
   }
 
   /** Frames the viewer and the closest storm together, clear of the banner and the sheet. */
@@ -637,7 +693,7 @@ function LiveMap({ status, place, onPick, summaryId, replay, allClouds }: Props)
   }
 
   useEffect(syncStorm, [status, replay, allClouds]);
-  useEffect(syncPlace, [place]);
+  useEffect(syncPlace, [place, current]);
   // Keyed by content: `saved` is a new array on every render.
   const savedKey = JSON.stringify(saved);
   useEffect(syncSaved, [savedKey]);

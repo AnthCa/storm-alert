@@ -131,6 +131,7 @@ export function HomeView() {
               summaryId="storm-summary"
               replay={replay ? replay.frames[replay.index] : null}
               allClouds={allClouds}
+              current={state === "healthy" || state === "degraded"}
             />
           )}
 
@@ -683,14 +684,21 @@ const CLOUD_GRADIENT = `linear-gradient(to right, ${CLOUD_RAMP.map(([, [r, g, b]
 function Legend({ allClouds, onToggleClouds }: { allClouds: boolean; onToggleClouds: () => void }) {
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex items-center gap-2 text-xs text-soft" aria-label="Leyenda: nubes de −38 a −62 grados, más frías más intensas; puntos amarillos, rayos">
+      <div
+        className="flex items-center gap-2 text-xs text-soft"
+        aria-label="Leyenda: nubes de −38 a −62 grados, más frías más intensas; rayo amarillo, rayos de los últimos 5 minutos; rayo apagado, de hace 5 a 10 minutos"
+      >
         <span className="shrink-0">Nubes</span>
         <span className="font-mono text-muted">−38°</span>
         <span className="h-2 min-w-12 grow rounded-full" style={{ background: CLOUD_GRADIENT }} aria-hidden="true" />
         <span className="font-mono text-muted">−62°</span>
-        <span className="ml-2 flex shrink-0 items-center gap-1.5">
-          <span className="size-1.5 rounded-full bg-[#FFF6C2] shadow-[0_0_6px_2px_rgba(255,225,77,0.5)]" aria-hidden="true" />
-          Rayo
+        <span className="ml-2 flex shrink-0 items-center gap-1">
+          <BoltFilledIcon size={12} className="text-[#FFE14D]" />
+          Rayo ahora
+        </span>
+        <span className="flex shrink-0 items-center gap-1">
+          <BoltFilledIcon size={12} className="text-[#B9A96A]" />
+          hace 5–10 min
         </span>
       </div>
       <button

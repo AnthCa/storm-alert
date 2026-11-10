@@ -299,6 +299,19 @@ describe("lightning safety", () => {
     expect(flash?.safeAfterUtc).toBe("2026-10-26T20:48:00.000Z");
   });
 
+  it("prefers the closer flash when two are equally recent", () => {
+    const flash = lastFlashNear(
+      status({
+        flash_cells_30min: [
+          [-34.36, -70.82, 0.1], // ~8 km south
+          [-34.3, -70.8, 0.1], // ~2 km southeast, same minute
+        ],
+      }),
+      ...REQUINOA,
+    );
+    expect(flash!.km).toBeLessThan(3);
+  });
+
   it("is null without close flashes", () => {
     expect(lastFlashNear(status({ flash_cells_30min: [[-34.29, -71.2, 1]] }), ...REQUINOA)).toBeNull();
   });
@@ -322,6 +335,23 @@ describe("replay", () => {
     expect(frames.map((f) => f.timeUtc)).toEqual(["2026-10-26T20:00:20+00:00", "2026-10-26T20:20:20+00:00"]);
     expect(frames[0].flashes).toEqual([[-34.3, -70.96]]);
     expect(frames[1]).toMatchObject({ cold: [[-34.3, -70.85, -45]], flashes: [[-34.3, -70.84]] });
+  });
+
+  it("ages each frame's flash cells from that scan, within 10 minutes of it", () => {
+    const frames = replayFrames(
+      status({
+        data_until_utc: "2026-10-26T20:30:00+00:00",
+        latest_scan_utc: "2026-10-26T20:20:20+00:00",
+        cold_history: [{ time_utc: "2026-10-26T20:00:20+00:00", cells: [] }],
+        flash_cells_30min: [
+          [-34.3, -70.95, 3], // 20:27: in the latest frame, 3 min old
+          [-34.3, -70.96, 12], // 20:18: too old for the latest frame
+          [-34.3, -70.97, 32], // 19:58: 2.3 min before the 20:00 scan
+        ],
+      }),
+    );
+    expect(frames[0].cells).toEqual([[-34.3, -70.97, 2.3]]);
+    expect(frames[1].cells).toEqual([[-34.3, -70.95, 3]]);
   });
 });
 
