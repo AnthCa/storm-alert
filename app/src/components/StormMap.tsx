@@ -162,7 +162,8 @@ function markerElement(className: string): HTMLDivElement {
 interface Props {
   status: Status | null;
   place: Place | null;
-  onPick: (lat: number, lon: number) => void;
+  /** `dragged`: the viewer moved their own pin, which is deliberate; a tap may not be. */
+  onPick: (lat: number, lon: number, dragged?: boolean) => void;
   /** Id of the text that summarises the map for screen readers. */
   summaryId: string;
   /** A replay frame to show instead of the live data, or null. */
@@ -673,7 +674,7 @@ function LiveMap({ status, place, onPick, summaryId, replay, allClouds, current 
       me.current.on("dragend", () => {
         userMoved.current = true;
         const { lat, lng } = me.current!.getLngLat();
-        latest.current.onPick(lat, lng);
+        latest.current.onPick(lat, lng, true);
       });
     }
     me.current.setLngLat([p.lon, p.lat]);
