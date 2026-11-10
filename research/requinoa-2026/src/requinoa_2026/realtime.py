@@ -376,8 +376,9 @@ HTML_TEMPLATE = """<!doctype html>
 const s = __STATUS__;
 const labels = {
   quiet: "Sin tormentas cerca de Requínoa",
-  deep_convection: "Nubes de tormenta cerca (topes de -38 °C o más fríos)",
-  severe: "ALERTA: tormenta severa intensificándose (posible granizo, viento fuerte o tornado)",
+  deep_convection: "Nubes muy frías cerca (topes de -38 °C o más fríos)",
+  severe: "Actividad convectiva intensa observada (observación experimental, no es un aviso oficial)",
+  unknown: "Datos incompletos: no podemos confirmar el estado",
 };
 const level = document.getElementById("level");
 level.textContent = labels[s.level];
