@@ -197,9 +197,9 @@ export default function HowItWorksPage() {
           <dt className="text-muted">Actualización</dt>
           <dd>cada 10 minutos (nubes) y cada 20 segundos (rayos)</dd>
           <dt className="text-muted">Algoritmo</dt>
-          <dd className="font-mono">2026.11-r1</dd>
+          <dd className="font-mono">2026.11-r2</dd>
           <dt className="text-muted">Revisado</dt>
-          <dd>2 de noviembre de 2026</dd>
+          <dd>10 de noviembre de 2026</dd>
         </dl>
       </section>
 

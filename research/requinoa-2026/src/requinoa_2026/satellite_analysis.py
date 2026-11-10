@@ -72,17 +72,28 @@ def flash_counts(flashes: pd.DataFrame, radius_km: float) -> pd.Series:
     return counts.reindex(full_range, fill_value=0)
 
 
-def lightning_jumps(counts: pd.Series, sigma: float = 2.0, history: int = 5, min_rate: float = 1.0) -> pd.Series:
+# A jump must also be a real rise. After a quiet spell the changes of the previous bins
+# are all zero, so "2 sigma" is zero and any handful of flashes passed the test: on
+# 2026-11-10 an ordinary thunderstorm (6 flashes in 5 minutes) read as intensifying.
+# Provisional floor, chosen as a defect fix and not validated against severe reports.
+MIN_JUMP_PER_MIN = 1.0
+
+
+def lightning_jumps(
+    counts: pd.Series, sigma: float = 2.0, history: int = 5, min_rate: float = 1.0, min_jump: float = MIN_JUMP_PER_MIN
+) -> pd.Series:
     """Simplified "2-sigma" lightning jump (after Schultz et al. 2009).
 
     A jump is flagged when the change in flash rate exceeds `sigma` standard
-    deviations of the changes over the previous `history` bins, and the rate is
-    at least `min_rate` flashes per minute (so noise at near-zero rates is ignored).
+    deviations of the changes over the previous `history` bins and at least
+    `min_jump` flashes per minute, and the rate is at least `min_rate` flashes per
+    minute (so noise at near-zero rates is ignored).
     """
     rate = counts / 5.0  # flashes per minute in 5-minute bins
     change = rate.diff()
     threshold = sigma * change.shift(1).rolling(history, min_periods=history).std()
-    return (change > threshold) & (rate >= min_rate)
+    # NaN (not enough history) must stay NaN so it never flags; clip keeps it.
+    return (change > threshold.clip(lower=min_jump)) & (rate >= min_rate)
 
 
 def main() -> None:

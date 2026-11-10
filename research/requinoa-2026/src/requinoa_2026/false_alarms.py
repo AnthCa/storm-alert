@@ -4,7 +4,8 @@ Run with:  uv run requinoa-false-alarms
 
 The rule was fixed BEFORE looking at other days, so it is not tuned to them:
 an alert fires in a 5-minute GLM bin when, within RADIUS_KM of Requínoa,
-  1. there is a 2-sigma lightning jump, and
+  1. there is a 2-sigma lightning jump of at least 1 flash per minute (the floor was
+     added on 2026-11-10, after seeing these days: see satellite_analysis.py), and
   2. the coldest cloud top is <= -38 C in the latest scan or the one before.
 """
 
