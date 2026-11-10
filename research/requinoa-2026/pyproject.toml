@@ -35,6 +35,7 @@ requinoa-rain-chance = "requinoa_2026.rain_chance:main"
 requinoa-goes = "requinoa_2026.goes:main"
 requinoa-satellite = "requinoa_2026.satellite_analysis:main"
 requinoa-false-alarms = "requinoa_2026.false_alarms:main"
+requinoa-severe-reports = "requinoa_2026.severe_reports:main"
 requinoa-push = "requinoa_2026.push:main"
 requinoa-realtime = "requinoa_2026.realtime:main"
 

@@ -4,3 +4,6 @@ __pycache__/
 .ipynb_checkpoints/
 *.idx
 site/
+
+# Field observations and media candidates: kept privately, not in the public repo.
+ground_truth/
