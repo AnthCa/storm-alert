@@ -1,6 +1,7 @@
 "use client";
 
-import maplibregl, { type GeoJSONSource } from "maplibre-gl";
+import maplibregl from "@/lib/maplibre";
+import type { GeoJSONSource } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { useEffect, useRef, useSyncExternalStore } from "react";
 import { NEAR_KM, circleRing, nearestStorm } from "@/lib/geo";
