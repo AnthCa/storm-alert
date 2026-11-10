@@ -42,6 +42,9 @@ const ALL_CLOUDS_KEY = "miranubes:all-clouds";
 export function HomeView() {
   const { status, error, demo, online, place, setPlace, clearPlace, locate } = useStatus();
   const [locateMessage, setLocateMessage] = useState<string | null>(null);
+  // A tap on the map while exploring it must not move a place that is already set:
+  // it waits here until the viewer confirms.
+  const [pendingMove, setPendingMove] = useState<{ lat: number; lon: number } | null>(null);
   // The map comes first: the sheet stays short unless the viewer asks for details.
   const [expanded, setExpanded] = useState(false);
   // Replay of the last scans: the frames are taken when it starts, so new data does not cut it.
@@ -127,7 +130,11 @@ export function HomeView() {
             <StormMap
               status={status}
               place={place}
-              onPick={(lat, lon) => setPlace({ lat, lon, source: "map" })}
+              onPick={(lat, lon, dragged) => {
+                if (place && !dragged) return setPendingMove({ lat, lon });
+                setPendingMove(null);
+                setPlace({ lat, lon, source: "map" });
+              }}
               summaryId="storm-summary"
               replay={replay ? replay.frames[replay.index] : null}
               allClouds={allClouds}
@@ -162,7 +169,6 @@ export function HomeView() {
         id="storm-summary"
         className="absolute inset-x-0 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-10 flex flex-col gap-2.5 rounded-t-[22px] border-t border-line bg-surface px-4 pt-1 pb-3 lg:static lg:w-[380px] lg:shrink-0 xl:w-[420px] lg:gap-5 lg:overflow-y-auto lg:rounded-none lg:border-t-0 lg:border-l lg:bg-bg lg:p-5"
         aria-label="Actividad en tu ubicación"
-        aria-live="polite"
       >
         {!wide && locateButton}
         {!wide && frames.length >= 2 && (
@@ -189,6 +195,24 @@ export function HomeView() {
           <p className="text-[13px] text-soft">
             Datos de nubes {localTime(status.latest_scan_utc)} · rayos {localTime(status.data_until_utc)}
           </p>
+        )}
+        {pendingMove && (
+          <div className="flex items-center gap-2 rounded-xl border border-line bg-surface-2 px-3 py-2" role="group" aria-label="Mover tu ubicación">
+            <span className="grow text-sm">¿Mover tu ubicación a ese punto?</span>
+            <button
+              type="button"
+              onClick={() => {
+                setPlace({ ...pendingMove, source: "map" });
+                setPendingMove(null);
+              }}
+              className="min-h-11 rounded-lg bg-accent px-3.5 text-sm font-semibold text-white"
+            >
+              Mover
+            </button>
+            <button type="button" onClick={() => setPendingMove(null)} className="min-h-11 px-2 text-sm font-semibold text-quiet">
+              No
+            </button>
+          </div>
         )}
         {place && activity && status ? (
           <PlaceSummary
@@ -587,12 +611,15 @@ function PlaceSummary(props: {
           Borrar
         </button>
       </div>
-      <h2 className={`text-xl font-bold tracking-tight ${tone}`}>{title}</h2>
+      {/* Only the headline is announced when it changes; the whole sheet would be read every minute. */}
+      <h2 className={`text-xl font-bold tracking-tight ${tone}`} aria-live="polite">
+        {title}
+      </h2>
       {flash && current && (
         <p className="flex gap-1.5 text-sm font-semibold text-bolt">
           <BoltFilledIcon size={14} className="mt-[3px] shrink-0" />
           <span>
-            Último rayo a {Math.round(flash.km)} km al {flash.direction}, a las {localTime(flash.atUtc)}. Si no caen
+            Último rayo detectado a unos {Math.round(flash.km)} km al {flash.direction}, a las {localTime(flash.atUtc)}. Si no caen
             más, quédate bajo techo hasta las {localTime(flash.safeAfterUtc)}.
           </span>
         </p>
