@@ -229,6 +229,17 @@ them except 26 Oct has a severe report to compare with. The severe level stays
 unvalidated until it is scored against a list of severe events (hail, wind damage)
 from regional media, on the dev / held-out split.
 
+## Cluster filter for mapped cold tops (2026-11-10)
+
+Phase B item 7, first half. Cold pixels are mapped, and distances measured, only in
+touching groups of 3 or more (`storm_mask` in realtime.py). Replay of 2026-10-31 from
+Rancagua, nearest cold top per scan, 16:30–17:50 UTC: raw 56, 75, 38, 36, 9, 5, 48, 56,
+20 km; filtered 116, 122, 133, 36, 37, 42, 48, 56, 118 km. The 9 km and 5 km readings
+were one or two pixels. Cost: a real cell is not drawn until it has 3 cold pixels (the
+grey all-clouds layer still shows it). Remaining jumps are cells forming and dying.
+Persistence across scans and per-cell tracking are still to do. The alert rule is
+unchanged: it reads the coldest top within 50 km.
+
 ## Reliability section in the app
 
 Published at the end of Phase A, and never before: no estimated or placeholder numbers.

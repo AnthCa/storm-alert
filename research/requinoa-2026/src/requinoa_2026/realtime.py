@@ -20,6 +20,7 @@ import numpy as np
 import pandas as pd
 import s3fs
 import xarray as xr
+from scipy import ndimage
 
 from requinoa_2026.config import BBOX, DATA_DIR, EVENT_LAT, EVENT_LON
 from requinoa_2026.false_alarms import COLD_TOP_C, RADIUS_KM, alert_times, episodes
@@ -68,6 +69,10 @@ CLOUD_FIELD_STEP = 2.5
 # ground), for the parallax shift: low cloud moves little, storm tops ~10 km.
 LAPSE_C_PER_KM = 6.5
 SURFACE_C = 15.0
+# Cold pixels are mapped only in touching groups of at least this many (~20 km2). Lone
+# pixels flicker around the -38 C threshold from one scan to the next: on 2026-10-31 the
+# "nearest storm" jumped from 3 km to 48 km that way. Same count the push sender asks for.
+MIN_CLUSTER_PIXELS = 3
 
 
 def classify(tops: pd.DataFrame, counts: pd.Series, at: pd.Timestamp) -> tuple[str, list[pd.Timestamp]]:
@@ -169,10 +174,19 @@ def fetch(start: datetime, end: datetime, fs: s3fs.S3FileSystem):
     return abi, flashes, data_end, glm_starts
 
 
+def storm_mask(bt_c: np.ndarray, min_pixels: int = MIN_CLUSTER_PIXELS) -> np.ndarray:
+    """Cold pixels that belong to a group of at least `min_pixels` touching ones
+    (sides or corners). Display and distances only: the alert rule reads the coldest top."""
+    cold = bt_c <= COLD_TOP_C
+    labels, count = ndimage.label(cold, structure=np.ones((3, 3)))
+    sizes = ndimage.sum_labels(cold, labels, index=np.arange(count + 1))
+    return cold & (sizes[labels] >= min_pixels)
+
+
 def cold_cells(scan: xr.Dataset, cell_deg: float = HISTORY_CELL_DEG) -> list[list[float]]:
     """Parallax-corrected cold cloud tops of one scan, as the coldest pixel per grid cell."""
     bt_c = scan.brightness_temp_k.values - 273.15
-    cold = bt_c <= COLD_TOP_C
+    cold = storm_mask(bt_c)
     if not cold.any():
         return []
     lats, lons = parallax_correct(scan.lat.values[cold], scan.lon.values[cold])
@@ -248,7 +262,8 @@ def latest_flash_cells(
 
 
 def map_layers(abi: xr.Dataset, flashes: pd.DataFrame, data_end: pd.Timestamp) -> dict:
-    """Cold cloud-top pixels of the latest scan and flashes of the last 10 minutes.
+    """Cold cloud-top pixels of the latest scan (groups of MIN_CLUSTER_PIXELS or more)
+    and flashes of the last 10 minutes.
 
     Cloud tops are parallax-corrected so they line up with the lightning (GLM
     positions already are). The alert rule uses uncorrected tops, as validated;
@@ -256,7 +271,7 @@ def map_layers(abi: xr.Dataset, flashes: pd.DataFrame, data_end: pd.Timestamp) -
     """
     last = abi.isel(time=-1)
     bt_c = last.brightness_temp_k.values - 273.15
-    cold = bt_c <= COLD_TOP_C
+    cold = storm_mask(bt_c)
     lats, lons = parallax_correct(last.lat.values[cold], last.lon.values[cold])
     cold_pixels = [
         [round(float(lat), 3), round(float(lon), 3), round(float(t), 1)] for lat, lon, t in zip(lats, lons, bt_c[cold])
