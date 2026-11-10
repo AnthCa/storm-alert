@@ -3,14 +3,21 @@
 Runs after each realtime cycle (see .github/workflows/storm-map.yml) when the
 repository variable PUSH_ENABLED is "true". Reads the status.json just written and
 the places of every active subscription from Supabase (infra/supabase/push_places.sql:
-up to three per phone, such as home, a school and the parents' house). Each place gets
-at most one notification per run, by priority:
+up to three per phone, such as home, a school and the parents' house).
 
-1. severe:    the alert area turned severe (once per episode), for testers whose
+Each place lives through episodes, so a long storm is told once per change, not on a timer:
+
+1. severe:    the alert area turned severe (once per severe episode), for testers whose
               radius reaches the alert circle.
-2. lightning: a flash within LIGHTNING_KM in the last 10 minutes (every 30 min at most).
-3. storm:     cold tops within the tester's radius (every 60 min at most); called a
-              storm only when lightning fell within that radius in the last 30 min.
+2. lightning: a flash within LIGHTNING_KM in the last 10 minutes; repeated every 60 min
+              at most while it goes on.
+3. storm:     cold tops within the tester's radius, once; once more if lightning then
+              falls within that radius ("storm with lightning"). Never after a
+              lightning notice, which already said more.
+4. clear:     after any notice about lightning, the first run with complete data and no
+              flash within the radius (LIGHTNING_KM at least) for 30 minutes.
+
+An episode told only as cold cloud ends silently when the cloud and the flashes are gone.
 
 Places closer than NEARBY_PLACES_KM to one already notified in the same run share its
 notice, and the severe notice goes once per phone. Notifications carry the place's slot;
@@ -37,7 +44,8 @@ LIGHTNING_KM = 15
 LIGHTNING_RECENT_MIN = 10
 # A few cold pixels, not one: single pixels flicker in and out at the -38 C threshold.
 STORM_MIN_PIXELS = 3
-COOLDOWN = {"severe": None, "lightning": timedelta(minutes=30), "storm": timedelta(minutes=60)}
+# "storm" spaces out new episodes of cold cloud, which can flicker in and out of a radius.
+COOLDOWN = {"severe": None, "lightning": timedelta(minutes=60), "storm": timedelta(minutes=60)}
 STALE_AFTER = timedelta(minutes=25)
 # Home and a school 3 km apart see the same storm: one notice is enough.
 NEARBY_PLACES_KM = 10
@@ -76,6 +84,16 @@ def _due(last: dict, kind: str, now: datetime) -> bool:
     return now - datetime.fromisoformat(sent) >= COOLDOWN[kind]
 
 
+def _signals(sub: dict, status: dict) -> tuple[list, list]:
+    """Cold pixels within the place's radius, and the flashes of the last 30 minutes
+    within that radius (LIGHTNING_KM at least: thunder is a risk that far)."""
+    lat, lon, radius = float(sub["lat"]), float(sub["lon"]), sub["radius_km"]
+    cold = [p for p in status.get("cold_pixels", []) if float(distance_km(lat, lon, p[0], p[1])) <= radius]
+    reach = max(radius, LIGHTNING_KM)
+    flashes = [f for f in status.get("flash_cells_30min", []) if float(distance_km(lat, lon, f[0], f[1])) <= reach]
+    return cold, flashes
+
+
 def choose(sub: dict, status: dict, now: datetime) -> Notification | None:
     """The one notification this tester should get now, if any."""
     data_until = datetime.fromisoformat(status["data_until_utc"])
@@ -83,6 +101,8 @@ def choose(sub: dict, status: dict, now: datetime) -> Notification | None:
         return None
     lat, lon, radius = float(sub["lat"]), float(sub["lon"]), sub["radius_km"]
     last = sub.get("last_notified") or {}
+    # What this place was last told in the episode under way: None, "cold" or "lightning".
+    told = last.get("open")
     note = "Observación experimental, no es un aviso oficial."
 
     center_lat, center_lon = status["center"]
@@ -100,32 +120,49 @@ def choose(sub: dict, status: dict, now: datetime) -> Notification | None:
     if flash and flash[0] <= LIGHTNING_KM and _due(last, "lightning", now):
         km, (f_lat, f_lon, age) = flash
         at = (data_until - timedelta(minutes=age)).astimezone(CHILE).strftime("%H:%M")
+        # GLM sees flashes inside the cloud too, on ~8 km pixels: "detected", never "struck".
         return Notification(
             "lightning",
-            f"Rayo a {round(km)} km al {direction(lat, lon, f_lat, f_lon)}",
-            f"Cayó a las {at}. Busca refugio bajo techo y espera 30 minutos sin rayos. {note}",
+            f"Rayo a unos {round(km)} km al {direction(lat, lon, f_lat, f_lon)}",
+            f"Detectado a las {at}. Busca refugio bajo techo. Te avisamos cuando pasen 30 minutos sin rayos. {note}",
         )
 
-    cold = status.get("cold_pixels", [])
-    within = [p for p in cold if float(distance_km(lat, lon, p[0], p[1])) <= radius]
-    if len(within) >= STORM_MIN_PIXELS and _due(last, "storm", now):
+    within, flashes = _signals(sub, status)
+    if len(within) >= STORM_MIN_PIXELS and told != "lightning":
         km, (s_lat, s_lon, _) = _nearest(lat, lon, within)
         where = f"a {round(km)} km al {direction(lat, lon, s_lat, s_lon)}"
         # Cold tops alone are often a grey sky of high cloud: say "storm" only with lightning.
-        flashes = status.get("flash_cells_30min", [])
-        if any(float(distance_km(lat, lon, f[0], f[1])) <= radius for f in flashes):
+        if flashes:
             return Notification(
                 "storm",
                 f"Tormenta con rayos {where}",
-                f"Hubo rayos dentro de tus {radius} km en la última media hora. Probabilidad alta de lluvia. {note}",
+                f"Hubo rayos cerca en la última media hora. Probabilidad alta de lluvia. {note}",
             )
+        if told is None and _due(last, "storm", now):
+            return Notification(
+                "storm",
+                f"Nubes muy frías {where}",
+                f"Sin rayos: puede llover o no. Si cae un rayo a menos de "
+                f"{LIGHTNING_KM} km te avisamos. {note}",
+            )
+
+    # "No lightning" is only a fact when every recent GLM file arrived.
+    if told == "lightning" and not flashes and status["health"]["state"] == "healthy":
         return Notification(
-            "storm",
-            f"Nubes muy frías {where}",
-            f"Sin rayos: puede llover o no. Si cae un rayo a menos de "
-            f"{LIGHTNING_KM} km te avisamos. {note}",
+            "clear",
+            "Ya no hay rayos cerca",
+            f"Pasaron 30 minutos sin rayos a menos de {max(radius, LIGHTNING_KM)} km. "
+            f"Si vuelves a oír truenos, entra de nuevo. {note}",
         )
     return None
+
+
+def ended_quietly(sub: dict, status: dict) -> bool:
+    """An episode told only as cold cloud is over: no cold tops and no flashes in reach."""
+    if (sub.get("last_notified") or {}).get("open") != "cold":
+        return False
+    within, flashes = _signals(sub, status)
+    return not within and not flashes and status["health"]["state"] == "healthy"
 
 
 def plan(places: list[dict], status: dict, now: datetime) -> list[tuple[dict, Notification, bool]]:
@@ -161,6 +198,12 @@ def mark(last: dict, notification: Notification, status: dict, now: datetime) ->
     updated = {**last, notification.kind: now.isoformat()}
     if notification.kind == "severe":
         updated["severe_episode"] = status.get("episode_start_utc")
+    elif notification.kind == "clear":
+        updated["open"] = None
+    elif notification.kind == "lightning" or notification.title.startswith("Tormenta con rayos"):
+        updated["open"] = "lightning"
+    else:
+        updated["open"] = "cold"
     return updated
 
 
@@ -197,6 +240,10 @@ def main() -> None:
         phones[row["subscription_id"]].append(row)
     sent = 0
     for sub_id, places in phones.items():
+        for place in places:
+            if ended_quietly(place, status):
+                place["last_notified"] = {**place["last_notified"], "open": None}
+                _rpc("sender_mark_place", {"token": token, "place_id": place["place_id"], "notified": place["last_notified"]})
         for place, notification, send in plan(places, status, now):
             if send:
                 try:
