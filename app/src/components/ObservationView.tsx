@@ -97,7 +97,7 @@ function headline(status: Status, state: ReturnType<typeof dataState>): { title:
       intro:
         state === "historical"
           ? "Observación histórica del 26 de octubre de 2026 cerca de Requínoa."
-          : "El satélite observa una tormenta que se intensifica cerca de Requínoa.",
+          : `El satélite observa una tormenta que se intensifica cerca de ${status.zone_name}.`,
     };
   }
   if (state === "stale" || state === "offline" || state === "unavailable" || status.level === "unknown") {
@@ -114,7 +114,7 @@ function headline(status: Status, state: ReturnType<typeof dataState>): { title:
   }
   return {
     title: "Sin actividad observada ahora",
-    intro: `En los ${status.radius_km} km alrededor de Requínoa. No descarta tormentas más tarde: revisa los pronósticos oficiales.`,
+    intro: `En los ${status.radius_km} km alrededor de ${status.zone_name}. No descarta tormentas más tarde: revisa los pronósticos oficiales.`,
   };
 }
 
@@ -155,7 +155,7 @@ function LightningChart({ status }: { status: Status }) {
     <Card>
       <div className="flex items-baseline justify-between">
         <h2 className="font-semibold">Rayos cada 5 minutos</h2>
-        <span className="text-xs text-muted">a 50 km de Requínoa</span>
+        <span className="text-xs text-muted">a {status.radius_km} km de {status.zone_name}</span>
       </div>
       <div className="flex h-36 items-end gap-1 border-b border-[#3a424d]" role="img" aria-label={`Rayos cada 5 minutos. ${described}`}>
         {bins.map((b) => (

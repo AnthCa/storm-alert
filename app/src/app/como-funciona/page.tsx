@@ -191,7 +191,7 @@ export default function HowItWorksPage() {
         <h2 className="text-lg font-semibold">Cobertura y versión</h2>
         <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm">
           <dt className="text-muted">Área de alerta</dt>
-          <dd>50 km alrededor de Requínoa</dd>
+          <dd>50 km alrededor de cada comuna; ves el de la más cercana a ti</dd>
           <dt className="text-muted">Mapa</dt>
           <dd>nubes y rayos de toda la zona de O&apos;Higgins, sin nivel de alerta</dd>
           <dt className="text-muted">Actualización</dt>
@@ -205,8 +205,10 @@ export default function HowItWorksPage() {
 
       <Note title="Límites que debes conocer">
         Observa actividad convectiva intensa; no predice tornados. Los datos pueden tardar unos minutos más en llegar,
-        y si faltan, lo decimos. Fuera de los 50 km alrededor de Requínoa solo mostramos lo que ve el
-        satélite (distancia y si las nubes se acercan), sin nivel de alerta. El tiempo estimado de llegada es una
+        y si faltan, lo decimos. El nivel de alerta se calcula 50 km alrededor de cada comuna con la misma regla
+        que se probó en Requínoa; en las demás todavía no se ha comparado con tormentas reales. A más de 50 km de
+        cualquier comuna solo mostramos lo que ve el satélite (distancia y si las nubes se acercan), sin nivel de
+        alerta. El tiempo estimado de llegada es una
         extrapolación del movimiento de los últimos 30 minutos: solo aparece si el acercamiento es constante, se da como
         rango y todavía no está validado. No reemplaza los avisos
         oficiales de SENAPRED ni de la Dirección Meteorológica.

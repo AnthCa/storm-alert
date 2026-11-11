@@ -33,9 +33,9 @@ import pandas as pd
 import requests
 import xarray as xr
 
-from requinoa_2026.config import DATA_DIR, RAW_DIR
+from requinoa_2026.config import DATA_DIR, RAW_DIR, TOWNS
 from requinoa_2026.glm_grid import OUT_DIR as GLM_DIR
-from requinoa_2026.rain_chance import TOWNS, coarse
+from requinoa_2026.rain_chance import coarse
 from requinoa_2026.score import BOOTSTRAP, DEV, HELD_OUT, metrics as ratios
 
 SCORING_VERSION = "t1"

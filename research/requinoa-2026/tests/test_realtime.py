@@ -173,3 +173,32 @@ def test_cloud_field_marks_cold_cloud_and_leaves_warm_ground_empty():
     values = np.frombuffer(base64.b64decode(field["data"]), dtype=np.uint8)
     assert values.max() == round((20 + 40) * 2.5)
     assert 0 in values  # cells far from any cloud stay clear
+
+
+def test_a_zone_reads_only_the_storm_within_its_own_radius():
+    from requinoa_2026.realtime import zone_status
+
+    # The 3-pixel scans sit at -34.3, -70.8 (by Requínoa); Pichilemu is ~110 km west.
+    abi = abi_scans([[-45.0, -45.0, -45.0]] * 2).assign_coords(
+        time=[ts("19:30:20").tz_localize(None), ts("19:40:20").tz_localize(None)]
+    )
+    index = jumping_counts().index
+    flashes = pd.DataFrame(
+        {"time": np.repeat(index + pd.Timedelta("1min"), jumping_counts().values), "lat": -34.3, "lon": -70.8}
+    )
+    files = glm_files("19:10", "19:50")
+    healthy = {"state": "healthy"}
+    args = (abi, flashes, ts("19:10"), ts("19:50"), files, healthy)
+    near = zone_status("Requínoa", (-34.29, -70.82), *args)
+    far = zone_status("Pichilemu", (-34.39, -72.0), *args)
+    assert (near["level"], near["alerts_utc"], near["episode_start_utc"]) == (
+        "severe",
+        [ts("19:40").isoformat()],
+        ts("19:40").isoformat(),
+    )
+    assert near["coldest_top_c"] == -45.0
+    assert [(b["count"], b["jump"]) for b in near["flashes_per_5min"][-2:]] == [(40, True), (41, False)]
+    assert [t["min_bt_c"] for t in near["cloud_tops"]] == [-45.0, -45.0]
+    # The test scan does not reach Pichilemu: without a cloud reading, quiet is not claimed.
+    assert (far["level"], far["alerts_utc"], far["coldest_top_c"]) == ("unknown", [], None)
+    assert {b["count"] for b in far["flashes_per_5min"]} == {0}

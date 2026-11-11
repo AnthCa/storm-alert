@@ -42,20 +42,23 @@ def parallax_correct(lat, lon, height_m: float = CLOUD_TOP_HEIGHT_M, sat_lon: fl
     return lat_c, lon_c
 
 
-def cloud_top_series(abi: xr.Dataset, radius_km: float) -> pd.DataFrame:
-    """Per scan: coldest cloud top near the event, its location, and cold-pixel count."""
-    dist = distance_km(EVENT_LAT, EVENT_LON, abi.lat.values, abi.lon.values)
+def cloud_top_series(abi: xr.Dataset, radius_km: float, center: tuple[float, float] = (EVENT_LAT, EVENT_LON)) -> pd.DataFrame:
+    """Per scan: coldest cloud top within `radius_km` of `center` (Requínoa unless given),
+    its distance from the centre, and the cold-pixel count."""
+    dist = distance_km(*center, abi.lat.values, abi.lon.values)
     near = dist <= radius_km
     rows = []
     for t in abi.time.values:
         bt = abi.brightness_temp_k.sel(time=t).values
         masked = np.where(near, bt, np.nan)
-        coldest = np.nanargmin(masked)
+        # No pixel in reach (a centre off the crop, or a blank scan): no reading, not a warm one.
+        seen = bool(np.isfinite(masked).any())
+        coldest = np.nanargmin(masked) if seen else 0
         rows.append(
             {
                 "time": pd.Timestamp(t).tz_localize("UTC"),
-                "min_bt_c": float(np.nanmin(masked)) - 273.15,
-                "coldest_km_from_requinoa": float(dist.flat[coldest]),
+                "min_bt_c": float(np.nanmin(masked)) - 273.15 if seen else float("nan"),
+                "coldest_km_from_requinoa": float(dist.flat[coldest]) if seen else float("nan"),
                 "pixels_below_minus38c": int(np.sum(masked < DEEP_CONVECTION_K)),
             }
         )
@@ -64,8 +67,8 @@ def cloud_top_series(abi: xr.Dataset, radius_km: float) -> pd.DataFrame:
     return series
 
 
-def flash_counts(flashes: pd.DataFrame, radius_km: float) -> pd.Series:
-    dist = distance_km(EVENT_LAT, EVENT_LON, flashes.lat.values, flashes.lon.values)
+def flash_counts(flashes: pd.DataFrame, radius_km: float, center: tuple[float, float] = (EVENT_LAT, EVENT_LON)) -> pd.Series:
+    dist = distance_km(*center, flashes.lat.values, flashes.lon.values)
     near = flashes[dist <= radius_km]
     counts = near.set_index("time").resample(GLM_BIN).size()
     full_range = pd.date_range(flashes.time.min().floor(GLM_BIN), flashes.time.max().ceil(GLM_BIN), freq=GLM_BIN)

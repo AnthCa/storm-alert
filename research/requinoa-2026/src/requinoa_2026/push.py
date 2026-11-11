@@ -7,8 +7,8 @@ up to three per phone, such as home, a school and the parents' house).
 
 Each place lives through episodes, so a long storm is told once per change, not on a timer:
 
-1. severe:    the alert area turned severe (once per severe episode), for testers whose
-              radius reaches the alert circle.
+1. severe:    the zone of the town nearest to the place turned severe (once per severe
+              episode of that zone). Before schema 6 there was one zone, around Requínoa.
 2. lightning: a flash within LIGHTNING_KM in the last 10 minutes; repeated every 60 min
               at most while it goes on.
 3. storm:     cold tops within the tester's radius, once; once more if lightning then
@@ -20,7 +20,7 @@ Each place lives through episodes, so a long storm is told once per change, not 
 An episode told only as cold cloud ends silently when the cloud and the flashes are gone.
 
 Places closer than NEARBY_PLACES_KM to one already notified in the same run share its
-notice, and the severe notice goes once per phone. Notifications carry the place's slot;
+notice, and the severe notice goes once per phone and zone. Notifications carry the place's slot;
 the phone adds the name it was given, which never reaches the server (app/public/sw.js).
 
 Everything is an experimental observation, never an official warning, and the
@@ -59,6 +59,8 @@ class Notification:
     kind: str
     title: str
     body: str
+    # Severe only: the zone and start of the episode, so it is told once.
+    episode: str | None = None
 
 
 def direction(lat1: float, lon1: float, lat2: float, lon2: float) -> str:
@@ -94,6 +96,21 @@ def _signals(sub: dict, status: dict) -> tuple[list, list]:
     return cold, flashes
 
 
+def zone_for(status: dict, lat: float, lon: float) -> dict | None:
+    """The alert zone of the town nearest to a point, if the point is inside its radius.
+    A status without zones (schema 5 and older) has one: the fields around Requínoa."""
+    zones = status.get("zones") or [
+        {
+            "name": "Requínoa",
+            "center": status["center"],
+            "level": status["level"],
+            "episode_start_utc": status.get("episode_start_utc"),
+        }
+    ]
+    zone = min(zones, key=lambda z: float(distance_km(lat, lon, *z["center"])))
+    return zone if float(distance_km(lat, lon, *zone["center"])) <= status["radius_km"] else None
+
+
 def choose(sub: dict, status: dict, now: datetime) -> Notification | None:
     """The one notification this tester should get now, if any."""
     data_until = datetime.fromisoformat(status["data_until_utc"])
@@ -105,14 +122,15 @@ def choose(sub: dict, status: dict, now: datetime) -> Notification | None:
     told = last.get("open")
     note = "Observación experimental, no es un aviso oficial."
 
-    center_lat, center_lon = status["center"]
-    reaches_alert_area = float(distance_km(lat, lon, center_lat, center_lon)) <= status["radius_km"] + radius
-    episode = status.get("episode_start_utc")
-    if status["level"] == "severe" and reaches_alert_area and episode and last.get("severe_episode") != episode:
+    zone = zone_for(status, lat, lon)
+    # The zone is part of the episode's name: two zones can turn severe at the same minute.
+    episode = f"{zone['name']}@{zone['episode_start_utc']}" if zone and zone.get("episode_start_utc") else None
+    if zone and zone["level"] == "severe" and episode and last.get("severe_episode") != episode:
         return Notification(
             "severe",
             "Actividad convectiva intensa",
-            f"Se observa una tormenta que se intensifica cerca de Requínoa. Revisa los avisos oficiales. {note}",
+            f"Se observa una tormenta que se intensifica cerca de {zone['name']}. Revisa los avisos oficiales. {note}",
+            episode,
         )
 
     recent = [f for f in status.get("flash_cells_30min", []) if f[2] <= LIGHTNING_RECENT_MIN]
@@ -179,17 +197,17 @@ def plan(places: list[dict], status: dict, now: datetime) -> list[tuple[dict, No
         lat, lon = float(place["lat"]), float(place["lon"])
         repeated = any(
             kind == notification.kind
-            and (kind == "severe" or float(distance_km(lat, lon, s_lat, s_lon)) < NEARBY_PLACES_KM)
-            for kind, s_lat, s_lon in sent
+            and (body == notification.body if kind == "severe" else float(distance_km(lat, lon, s_lat, s_lon)) < NEARBY_PLACES_KM)
+            for kind, s_lat, s_lon, body in sent
         )
         if not repeated:
-            sent.append((notification.kind, lat, lon))
+            sent.append((notification.kind, lat, lon, notification.body))
         planned.append((place, notification, not repeated))
     return planned
 
 
 def payload(place: dict, notification: Notification) -> dict:
-    # The severe notice is about the alert area, not about one of the places.
+    # The severe notice is about a town's zone, not about one of the places.
     slot = None if notification.kind == "severe" else place.get("slot")
     return {"title": notification.title, "body": notification.body, "tag": notification.kind, "url": APP_URL, "place": slot}
 
@@ -197,7 +215,7 @@ def payload(place: dict, notification: Notification) -> dict:
 def mark(last: dict, notification: Notification, status: dict, now: datetime) -> dict:
     updated = {**last, notification.kind: now.isoformat()}
     if notification.kind == "severe":
-        updated["severe_episode"] = status.get("episode_start_utc")
+        updated["severe_episode"] = notification.episode
     elif notification.kind == "clear":
         updated["open"] = None
     elif notification.kind == "lightning" or notification.title.startswith("Tormenta con rayos"):

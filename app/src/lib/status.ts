@@ -46,6 +46,24 @@ export interface CloudField {
   data: string;
 }
 
+/**
+ * The alert rule around one town (schema 6+): same rule and radius as around Requínoa,
+ * where it was first tried. Elsewhere it has never been checked against a storm.
+ */
+export interface Zone {
+  name: string;
+  /** [lat, lon] of the town. */
+  center: [number, number];
+  level: Level;
+  alerts_utc: string[];
+  episode_start_utc: string | null;
+  /** null when no cloud reading reached the zone. */
+  coldest_top_c: number | null;
+  flashes_per_5min: FlashBin[];
+  /** min_bt_c is null for a scan with no cloud reading in the zone. */
+  cloud_tops: { time_utc: string; min_bt_c: number | null }[];
+}
+
 export interface Status {
   schema_version: number;
   algorithm_version: string;
@@ -59,8 +77,13 @@ export interface Status {
   coldest_top_c: number;
   coldest_km_from_requinoa: number;
   radius_km: number;
-  /** [lat, lon] of Requínoa. */
+  /** [lat, lon] of the alert zone these fields describe: Requínoa as published, or the
+   * viewer's zone after focusStatus. */
   center: [number, number];
+  /** Town at the centre of that zone. */
+  zone_name: string;
+  /** Every town's zone (schema 6+); empty in older files, where Requínoa is the only one. */
+  zones: Zone[];
   flashes_per_5min: FlashBin[];
   cloud_tops: CloudTop[];
   /** [lat, lon, brightness temperature in C], parallax-corrected, latest scan only. */
@@ -124,6 +147,8 @@ export function normalizeStatus(raw: Partial<Status> & Pick<Status, "level" | "d
     algorithm_version: raw.algorithm_version ?? "desconocida",
     health,
     level: raw.level === "quiet" && health.state !== "healthy" ? "unknown" : raw.level,
+    zone_name: raw.zone_name ?? "Requínoa",
+    zones: raw.zones ?? [],
     alerts_utc: raw.alerts_utc ?? [],
     episode_start_utc: raw.episode_start_utc ?? null,
     flashes_per_5min: (raw.flashes_per_5min ?? []).map((b) => ({ ...b, jump: b.jump ?? false })),
@@ -135,6 +160,49 @@ export function normalizeStatus(raw: Partial<Status> & Pick<Status, "level" | "d
     recent_flashes: raw.recent_flashes ?? [],
     flash_cells_30min: raw.flash_cells_30min ?? [],
   } as Status;
+}
+
+const km = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+  const rad = Math.PI / 180;
+  const a =
+    Math.sin(((lat2 - lat1) * rad) / 2) ** 2 +
+    Math.cos(lat1 * rad) * Math.cos(lat2 * rad) * Math.sin(((lon2 - lon1) * rad) / 2) ** 2;
+  return 2 * 6371 * Math.asin(Math.sqrt(a));
+};
+
+const LEVEL_RANK: Record<Level, number> = { severe: 3, deep_convection: 2, unknown: 1, quiet: 0 };
+
+/**
+ * The zone a viewer should hear about: with a place, the nearest town's (also when the
+ * place is beyond its radius: the app then says it is outside); without one, the zone
+ * with the most activity. null when the file has no zones.
+ */
+export function zoneFor(status: Status, place: { lat: number; lon: number } | null): Zone | null {
+  if (status.zones.length === 0) return null;
+  if (!place) return status.zones.reduce((worst, z) => (LEVEL_RANK[z.level] > LEVEL_RANK[worst.level] ? z : worst));
+  return status.zones.reduce((best, z) =>
+    km(place.lat, place.lon, ...z.center) < km(place.lat, place.lon, ...best.center) ? z : best,
+  );
+}
+
+/**
+ * The status as it reads for one viewer: level, alerts, lightning counts and cloud tops
+ * of their zone in place of Requínoa's. Map layers are regional and stay as they are.
+ */
+export function focusStatus(status: Status, place: { lat: number; lon: number } | null): Status {
+  const zone = zoneFor(status, place);
+  if (!zone) return status;
+  return {
+    ...status,
+    zone_name: zone.name,
+    center: zone.center,
+    level: zone.level,
+    alerts_utc: zone.alerts_utc,
+    episode_start_utc: zone.episode_start_utc,
+    coldest_top_c: zone.coldest_top_c ?? status.coldest_top_c,
+    flashes_per_5min: zone.flashes_per_5min.map((b) => ({ ...b, jump: b.jump ?? false })),
+    cloud_tops: zone.cloud_tops.filter((t): t is CloudTop => t.min_bt_c !== null),
+  };
 }
 
 export function minutesOld(status: Status, now: Date): number {
