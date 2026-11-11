@@ -42,14 +42,14 @@ export function WeatherLine({ lat, lon, refreshKey, hideRain }: Props) {
   const w = useWeather(lat, lon, refreshKey);
   if (!w) return null;
   return (
-    <p className="flex flex-wrap items-baseline gap-x-2.5 text-sm text-soft">
+    <p className="flex flex-wrap items-baseline gap-x-2.5 text-[15px] text-soft">
       <span className="font-semibold text-fg">{deg(w.tempC)}C</span>
       <span>sensación {deg(w.feelsC)}</span>
       <span>
         viento {kmh(w.windKmh)} {w.windFrom}
       </span>
       {w.rainChance !== null && !hideRain && <span>{rainOutlook(w.rainChance)} la próxima hora</span>}
-      <span className="text-xs text-muted">modelo Open-Meteo</span>
+      <span className="text-[13px] text-muted">modelo Open-Meteo</span>
     </p>
   );
 }
@@ -74,7 +74,7 @@ export function WeatherDetails({ lat, lon, town, refreshKey, hideRain }: Props) 
       <dl className="grid grid-cols-3 gap-x-2 gap-y-3">
         {items.map(([label, value]) => (
           <div key={label} className="flex flex-col gap-0.5">
-            <dt className="text-xs text-muted">{label}</dt>
+            <dt className="text-[13px] text-muted">{label}</dt>
             <dd className="text-base font-semibold">{value}</dd>
           </div>
         ))}
@@ -85,7 +85,7 @@ export function WeatherDetails({ lat, lon, town, refreshKey, hideRain }: Props) 
           <span className="font-semibold">{rainOutlook(w.rainChance)}</span>
         </p>
       )}
-      <p className="text-[11px] leading-snug text-muted">{SOURCE}</p>
+      <p className="text-[13px] leading-snug text-muted">{SOURCE}</p>
     </section>
   );
 }

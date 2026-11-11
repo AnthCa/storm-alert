@@ -78,7 +78,7 @@ export function ObservationView() {
       )}
 
       <Note title="Lo que esta observación no puede decir">
-        El satélite detecta actividad convectiva intensa, pero no distingue si habrá granizo, viento fuerte o un
+        El satélite detecta tormentas eléctricas que se intensifican, pero no distingue si habrá granizo, viento fuerte o un
         tornado. Para eso hace falta radar, y la región no lo tiene. No es un aviso oficial: sigue las indicaciones de
         SENAPRED y la Dirección Meteorológica.
       </Note>
@@ -93,7 +93,7 @@ export function ObservationView() {
 function headline(status: Status, state: ReturnType<typeof dataState>): { title: string; intro: string } {
   if (status.level === "severe") {
     return {
-      title: "Actividad convectiva intensa",
+      title: "Tormenta eléctrica intensificándose",
       intro:
         state === "historical"
           ? "Observación histórica del 26 de octubre de 2026 cerca de Requínoa."
@@ -137,7 +137,7 @@ function OfficialCheck() {
 function Fact({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex flex-col gap-1 rounded-xl border border-line bg-surface p-3">
-      <div className="text-xs text-muted">{label}</div>
+      <div className="text-[13px] text-muted">{label}</div>
       <div className="font-mono">{value}</div>
     </div>
   );
@@ -155,7 +155,7 @@ function LightningChart({ status }: { status: Status }) {
     <Card>
       <div className="flex items-baseline justify-between">
         <h2 className="font-semibold">Rayos cada 5 minutos</h2>
-        <span className="text-xs text-muted">a {status.radius_km} km de {status.zone_name}</span>
+        <span className="text-[13px] text-muted">a {status.radius_km} km de {status.zone_name}</span>
       </div>
       <div className="flex h-36 items-end gap-1 border-b border-[#3a424d]" role="img" aria-label={`Rayos cada 5 minutos. ${described}`}>
         {bins.map((b) => (
@@ -172,7 +172,7 @@ function LightningChart({ status }: { status: Status }) {
           </div>
         ))}
       </div>
-      <div className="flex justify-between font-mono text-[11px] text-muted">
+      <div className="flex justify-between font-mono text-[13px] text-muted">
         {labels.map((b) => (
           <span key={b.start_utc}>{localTime(b.start_utc)}</span>
         ))}
@@ -206,7 +206,7 @@ function CloudTops({ status }: { status: Status }) {
     <Card>
       <div className="flex items-baseline justify-between">
         <h2 className="font-semibold">Temperatura del tope de la nube</h2>
-        <span className="text-xs text-muted">más fría = más alta</span>
+        <span className="text-[13px] text-muted">más fría = más alta</span>
       </div>
       <ul className="grid grid-cols-4 gap-2">
         {tops.map((t) => (

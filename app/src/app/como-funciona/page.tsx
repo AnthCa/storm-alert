@@ -23,7 +23,7 @@ const LEVELS = [
     text: "Hay nubes muy altas (topes de −38 °C o más fríos). Puede haber chubascos y rayos.",
   },
   {
-    name: "Actividad convectiva intensa",
+    name: "Tormenta eléctrica intensificándose",
     dot: "bg-[#ff6b5b]",
     tone: "text-severe",
     text: "Nube muy alta y los rayos se disparan de golpe. Puede traer granizo, viento fuerte o, rara vez, un tornado. Es una observación experimental, no un aviso oficial.",
@@ -204,7 +204,7 @@ export default function HowItWorksPage() {
       </section>
 
       <Note title="Límites que debes conocer">
-        Observa actividad convectiva intensa; no predice tornados. Los datos pueden tardar unos minutos más en llegar,
+        Observa tormentas eléctricas que se intensifican; no predice tornados. Los datos pueden tardar unos minutos más en llegar,
         y si faltan, lo decimos. El nivel de alerta se calcula 50 km alrededor de cada comuna con la misma regla
         que se probó en Requínoa; en las demás todavía no se ha comparado con tormentas reales. A más de 50 km de
         cualquier comuna solo mostramos lo que ve el satélite (distancia y si las nubes se acercan), sin nivel de

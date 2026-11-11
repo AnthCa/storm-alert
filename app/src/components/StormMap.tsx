@@ -710,7 +710,7 @@ function LiveMap({ status, place, onPick, summaryId, replay, allClouds, current 
       ref={container}
       className="size-full"
       role="region"
-      aria-label="Mapa de actividad convectiva. Toca para marcar tu ubicación."
+      aria-label="Mapa de tormentas y rayos. Toca para marcar tu ubicación."
       aria-describedby={summaryId}
     />
   );

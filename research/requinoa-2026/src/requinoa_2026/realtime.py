@@ -440,7 +440,7 @@ const s = __STATUS__;
 const labels = {
   quiet: "Sin tormentas cerca de Requínoa",
   deep_convection: "Nubes muy frías cerca (topes de -38 °C o más fríos)",
-  severe: "Actividad convectiva intensa observada (observación experimental, no es un aviso oficial)",
+  severe: "Tormenta eléctrica intensificándose (observación experimental, no es un aviso oficial)",
   unknown: "Datos incompletos: no podemos confirmar el estado",
 };
 const level = document.getElementById("level");
