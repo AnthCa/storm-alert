@@ -165,7 +165,7 @@ export function AlertsSettings() {
         <h2 className="text-[17px] font-semibold">Cuándo te avisamos</h2>
         <ul className="flex list-disc flex-col gap-1.5 pl-5 text-[15px] leading-relaxed text-soft">
           <li>
-            <strong className="text-fg">Actividad intensa</strong> cerca de la comuna más próxima a cada lugar: una vez
+            <strong className="text-fg">Tormenta eléctrica intensificándose</strong> cerca de la comuna más próxima a cada lugar: una vez
             por episodio.
           </li>
           <li>

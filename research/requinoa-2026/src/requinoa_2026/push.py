@@ -128,7 +128,7 @@ def choose(sub: dict, status: dict, now: datetime) -> Notification | None:
     if zone and zone["level"] == "severe" and episode and last.get("severe_episode") != episode:
         return Notification(
             "severe",
-            "Actividad convectiva intensa",
+            "Tormenta eléctrica intensificándose",
             f"Se observa una tormenta que se intensifica cerca de {zone['name']}. Revisa los avisos oficiales. {note}",
             episode,
         )

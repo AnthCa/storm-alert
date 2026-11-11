@@ -70,7 +70,7 @@ export function SkyReport({ place, status, now }: { place: { lat: number; lon: n
           );
         })}
       </div>
-      <p className="text-xs text-muted">
+      <p className="text-[13px] text-muted">
         Anónimo: enviamos lo que marcas y tu punto aproximado (~1 km), sin tu nombre ni tu teléfono.
       </p>
       {state === "error" && (

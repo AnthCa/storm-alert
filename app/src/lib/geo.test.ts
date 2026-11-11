@@ -235,7 +235,7 @@ describe("storm trend", () => {
 describe("share message", () => {
   it("names the level and time but never a location", () => {
     const text = shareMessage(status({ level: "quiet" }));
-    expect(text).toContain("sin actividad convectiva");
+    expect(text).toContain("sin tormentas");
     expect(text).toContain("no oficial");
     expect(text).not.toMatch(/-34\.|-70\./);
   });

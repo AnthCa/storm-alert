@@ -199,7 +199,7 @@ export function HomeView() {
         )}
         {pendingMove && (
           <div className="flex items-center gap-2 rounded-xl border border-line bg-surface-2 px-3 py-2" role="group" aria-label="Mover tu ubicación">
-            <span className="grow text-sm">¿Mover tu ubicación a ese punto?</span>
+            <span className="grow text-[15px]">¿Mover tu ubicación a ese punto?</span>
             <button
               type="button"
               onClick={() => {
@@ -275,7 +275,7 @@ export function HomeView() {
           </div>
         </div>
         {wide ? (
-          <p className="text-xs leading-relaxed text-muted">
+          <p className="text-[13px] leading-relaxed text-muted">
             Observación experimental. No reemplaza los avisos de SENAPRED ni de la Dirección Meteorológica.
           </p>
         ) : (
@@ -385,7 +385,7 @@ function StateBanner(props: {
       >
         <WarningIcon />
         <div className="flex grow flex-col gap-0.5">
-          <div className="text-[15px] font-bold">Actividad convectiva intensa observada</div>
+          <div className="text-[15px] font-bold">Tormenta eléctrica intensificándose</div>
           <div className="text-[13px]">
             Observación experimental cerca de {status.zone_name}. Revisa los avisos oficiales.{partial}
           </div>
@@ -402,12 +402,12 @@ function StateBanner(props: {
   // With a place set, the sheet carries the detail: the banner shrinks to one line.
   if (hasPlace && (status.level === "deep_convection" || status.level === "quiet")) {
     const title = warmLightning
-      ? "Área de alerta: hay rayos, sin nubes muy frías"
+      ? "Cerca de ti: rayos, sin nubes altas"
       : status.level === "quiet"
-        ? "Área de alerta: sin actividad ahora"
+        ? "Cerca de ti: sin tormentas ahora"
         : areaLightning
-          ? "Área de alerta: tormenta con rayos"
-          : "Área de alerta: nubes muy frías, sin rayos";
+          ? "Cerca de ti: tormenta con rayos"
+          : "Cerca de ti: nubes altas y frías, sin rayos";
     return (
       <CompactBanner tone={status.level === "quiet" && !warmLightning ? "quiet" : "convective"} title={title} />
     );
@@ -629,7 +629,7 @@ function PlaceSummary(props: {
         {title}
       </h2>
       {flash && current && (
-        <p className="flex gap-1.5 text-sm font-semibold text-bolt">
+        <p className="flex gap-1.5 text-[15px] font-semibold text-bolt">
           <BoltFilledIcon size={14} className="mt-[3px] shrink-0" />
           <span>
             Último rayo detectado a unos {Math.round(flash.km)} km al {flash.direction}, a las {localTime(flash.atUtc)}. Si no caen
@@ -637,7 +637,7 @@ function PlaceSummary(props: {
           </span>
         </p>
       )}
-      <p className="text-sm text-soft">{advice}</p>
+      <p className="text-[15px] text-soft">{advice}</p>
       {rain && current && <RainLikelihood level={rain} detailed={detailed} />}
       {context && current && (detailed || level !== "outside") && <p className="text-[13px] text-soft">{context}</p>}
       {!current && (level !== "outside" || observed) && (
@@ -711,9 +711,9 @@ function Stats({ status, activity, current }: { status: Status; activity: Activi
 function Stat({ label, value, note, highlight }: { label: string; value: string; note: string; highlight?: boolean }) {
   return (
     <div className="flex flex-col gap-1 rounded-xl bg-surface-2 p-2.5">
-      <div className="text-xs text-muted">{label}</div>
+      <div className="text-[13px] text-muted">{label}</div>
       <div className={`font-mono text-lg ${highlight ? "text-severe" : ""}`}>{value}</div>
-      <div className="text-[11px] text-muted">{note}</div>
+      <div className="text-[13px] leading-snug text-muted">{note}</div>
     </div>
   );
 }
@@ -725,14 +725,16 @@ function Legend({ allClouds, onToggleClouds }: { allClouds: boolean; onToggleClo
   return (
     <div className="flex flex-col gap-2">
       <div
-        className="flex items-center gap-2 text-xs text-soft"
-        aria-label="Leyenda: nubes de −38 a −62 grados, más frías más intensas; rayo amarillo, rayos de los últimos 5 minutos; rayo apagado, de hace 5 a 10 minutos"
+        className="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-[13px] text-soft"
+        aria-label="Leyenda: nubes de tormenta, de débil a intensa; rayo amarillo, rayos de los últimos 5 minutos; rayo apagado, de hace 5 a 10 minutos"
       >
-        <span className="shrink-0">Nubes</span>
-        <span className="font-mono text-muted">−38°</span>
-        <span className="h-2 min-w-12 grow rounded-full" style={{ background: CLOUD_GRADIENT }} aria-hidden="true" />
-        <span className="font-mono text-muted">−62°</span>
-        <span className="ml-2 flex shrink-0 items-center gap-1">
+        <span className="flex min-w-48 grow items-center gap-2">
+          <span className="shrink-0">Nubes</span>
+          <span className="text-muted">débil</span>
+          <span className="h-2 min-w-12 grow rounded-full" style={{ background: CLOUD_GRADIENT }} aria-hidden="true" />
+          <span className="text-muted">intensa</span>
+        </span>
+        <span className="flex shrink-0 items-center gap-1">
           <BoltFilledIcon size={12} className="text-[#FFE14D]" />
           Rayo ahora
         </span>
@@ -745,7 +747,7 @@ function Legend({ allClouds, onToggleClouds }: { allClouds: boolean; onToggleClo
         type="button"
         aria-pressed={allClouds}
         onClick={onToggleClouds}
-        className="flex min-h-9 items-center gap-2 self-start text-xs text-soft"
+        className="flex min-h-9 items-center gap-2 self-start text-[13px] text-soft"
       >
         <span
           className={`flex size-4 items-center justify-center rounded border ${allClouds ? "border-quiet bg-quiet text-bg" : "border-line"}`}
