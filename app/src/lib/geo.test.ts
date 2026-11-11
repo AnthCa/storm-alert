@@ -42,6 +42,8 @@ function status(overrides: Partial<Status> = {}): Status {
     coldest_km_from_requinoa: 16,
     radius_km: 50,
     center: REQUINOA,
+    zone_name: "Requínoa",
+    zones: [],
     flashes_per_5min: [],
     cloud_tops: [],
     cold_pixels: [],

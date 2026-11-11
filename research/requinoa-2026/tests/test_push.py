@@ -187,6 +187,37 @@ def test_distant_places_each_get_their_notice():
     assert planned[1][1].title.startswith("Nubes muy frías a 4 km")
 
 
+def zones(**levels) -> list[dict]:
+    centers = {"Rancagua": [-34.17, -70.74], "San Fernando": [-34.58, -70.99], "Pichilemu": [-34.39, -72.0]}
+    return [
+        {"name": n, "center": c, "level": levels.get(n.replace(" ", "_"), "quiet"),
+         "episode_start_utc": "2026-10-26T19:40:00+00:00" if levels.get(n.replace(" ", "_")) == "severe" else None}
+        for n, c in centers.items()
+    ]
+
+
+def test_severe_names_the_zone_of_the_nearest_town():
+    state = status(zones=zones(Rancagua="severe"))
+    notification = choose(RANCAGUA, state, NOW)
+    assert notification.kind == "severe" and "cerca de Rancagua" in notification.body
+    assert choose(told(RANCAGUA, notification, state), state, NOW) is None
+    coast = {**RANCAGUA, "lat": -34.39, "lon": -71.95}
+    assert choose(coast, state, NOW) is None  # Pichilemu's zone is quiet
+
+
+def test_a_place_gets_its_own_zone_not_requinoas():
+    # Requínoa's own fields say severe; the place's nearest town (Pichilemu) is quiet.
+    state = status(level="severe", episode_start_utc="2026-10-26T19:40:00+00:00", zones=zones())
+    coast = {**RANCAGUA, "lat": -34.39, "lon": -71.95}
+    assert choose(coast, state, NOW) is None
+
+
+def test_two_zones_severe_at_once_are_two_notices_and_one_zone_is_one():
+    state = status(zones=zones(Rancagua="severe", San_Fernando="severe"))
+    planned = plan([HOME, SCHOOL, PARENTS], state, NOW)
+    assert [(p["slot"], send) for p, _, send in planned] == [(0, True), (1, False), (2, True)]
+
+
 def test_severe_goes_once_per_phone_without_a_place():
     severe = status(level="severe", episode_start_utc="2026-10-26T19:40:00+00:00")
     planned = plan([HOME, PARENTS], severe, NOW)

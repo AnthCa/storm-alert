@@ -387,7 +387,7 @@ function StateBanner(props: {
         <div className="flex grow flex-col gap-0.5">
           <div className="text-[15px] font-bold">Actividad convectiva intensa observada</div>
           <div className="text-[13px]">
-            Observación experimental cerca de Requínoa. Revisa los avisos oficiales.{partial}
+            Observación experimental cerca de {status.zone_name}. Revisa los avisos oficiales.{partial}
           </div>
         </div>
         <ChevronRightIcon size={18} />
@@ -437,18 +437,26 @@ function StateBanner(props: {
       </Banner>
     );
   }
+  // No place set and every town's zone is quiet: the answer is about the region.
+  if (status.zones.length > 0) {
+    return (
+      <Banner tone="quiet" title="Sin actividad observada ahora">
+        En ninguna de las {status.zones.length} comunas de O&apos;Higgins que vigilamos. <ForecastNote />
+      </Banner>
+    );
+  }
   const regional = nearestStorm(status, ...status.center);
   if (regional && regional.km > status.radius_km) {
     return (
       <Banner tone="quiet" title="Sin actividad observada en el área de alerta">
-        {`Hay nubes de tormenta a ${Math.round(regional.km)} km al ${regional.direction} de Requínoa, fuera de los ${status.radius_km} km que vigilamos. `}
+        {`Hay nubes de tormenta a ${Math.round(regional.km)} km al ${regional.direction} de ${status.zone_name}, fuera de sus ${status.radius_km} km de alerta. `}
         <ForecastNote />
       </Banner>
     );
   }
   return (
     <Banner tone="quiet" title="Sin actividad observada ahora">
-      En los {status.radius_km} km alrededor de Requínoa. <ForecastNote />
+      En los {status.radius_km} km alrededor de {status.zone_name}. <ForecastNote />
     </Banner>
   );
 }
@@ -561,11 +569,11 @@ function PlaceSummary(props: {
     advice = storm
       ? [`Al ${storm.direction} de ti.`, movement].filter(Boolean).join(" ")
       : "El satélite no ve nubes de tormenta en la región.";
-    context = `Estás fuera del área de alerta (${status.radius_km} km alrededor de Requínoa): aquí solo mostramos lo que ve el satélite. Revisa los avisos oficiales.`;
+    context = `Estás a más de ${status.radius_km} km de ${status.zone_name}, la comuna más cercana con nivel de alerta: aquí solo mostramos lo que ve el satélite. Revisa los avisos oficiales.`;
     tone = storm && storm.km <= AROUND_KM ? "text-convective" : "text-soft";
   } else if (level === "outside") {
     title = "Fuera del área monitoreada";
-    advice = `Por ahora solo observamos la zona de O'Higgins y alertamos ${status.radius_km} km alrededor de Requínoa. Revisa los avisos oficiales para tu zona.`;
+    advice = `Por ahora solo observamos la zona de O'Higgins. Revisa los avisos oficiales para tu zona.`;
     tone = "text-soft";
   } else if (level === "over" && activity.flashesNear > 0) {
     title = "Tormenta con rayos sobre tu zona";

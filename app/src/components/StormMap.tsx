@@ -73,14 +73,17 @@ function boxOutline(box: Bbox): Feature {
 }
 
 /** Live data, or one frame of the replay while it plays. */
-function stormData(status: Status | null, replay: ReplayFrame | null) {
+/** The alert circle is drawn for a viewer's own zone, or for the only zone of files without zones. */
+const showsArea = (status: Status | null, place: Place | null) => !!status && (!!place || status.zones.length === 0);
+
+function stormData(status: Status | null, replay: ReplayFrame | null, area: boolean) {
   const cold = replay?.cold ?? status?.cold_pixels ?? [];
   const cells = replay?.cells ?? (status ? flashCells(status) : []);
   return {
     cold,
     flashes: collection(cells.map(([lat, lon, age]) => point(lat, lon, { age }))),
-    area: collection(status ? [ring(status.center[0], status.center[1], status.radius_km)] : []),
-    outside: collection(status ? [outsideMask(status.center[0], status.center[1], status.radius_km)] : []),
+    area: collection(status && area ? [ring(status.center[0], status.center[1], status.radius_km)] : []),
+    outside: collection(status && area ? [outsideMask(status.center[0], status.center[1], status.radius_km)] : []),
     observed: collection(status?.observed_bbox ? [boxOutline(status.observed_bbox)] : []),
   };
 }
@@ -326,7 +329,7 @@ function LiveMap({ status, place, onPick, summaryId, replay, allClouds, current 
         m.setPaintProperty(layer.id, "text-halo-color", "#0e1116");
         m.setPaintProperty(layer.id, "text-halo-width", 1.6);
       }
-      const data = stormData(latest.current.status, latest.current.replay);
+      const data = stormData(latest.current.status, latest.current.replay, showsArea(latest.current.status, latest.current.place));
       m.addSource("relief", {
         type: "raster-dem",
         tiles: [RELIEF_URL],
@@ -584,7 +587,7 @@ function LiveMap({ status, place, onPick, summaryId, replay, allClouds, current 
   function syncStorm() {
     const m = map.current;
     if (!m || !ready.current) return;
-    const data = stormData(latest.current.status, latest.current.replay);
+    const data = stormData(latest.current.status, latest.current.replay, showsArea(latest.current.status, latest.current.place));
     (m.getSource("outside") as GeoJSONSource).setData(data.outside);
     (m.getSource("area") as GeoJSONSource).setData(data.area);
     (m.getSource("observed") as GeoJSONSource).setData(data.observed);

@@ -22,7 +22,7 @@ import s3fs
 import xarray as xr
 from scipy import ndimage
 
-from requinoa_2026.config import BBOX, DATA_DIR, EVENT_LAT, EVENT_LON
+from requinoa_2026.config import BBOX, DATA_DIR, EVENT_LAT, EVENT_LON, TOWNS
 from requinoa_2026.false_alarms import COLD_TOP_C, RADIUS_KM, alert_times, episodes
 from requinoa_2026.goes import hourly_keys, read_abi_crop, read_glm_flashes, scan_start, with_retries
 from requinoa_2026.satellite_analysis import GLM_BIN, cloud_top_series, flash_counts, lightning_jumps, parallax_correct
@@ -35,7 +35,7 @@ LOOKBACK = timedelta(minutes=45)
 ALERT_MEMORY = pd.Timedelta("30min")
 CYCLE_S = 600
 
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6
 # Bump whenever the alert rule or its thresholds change (see false_alarms.py).
 ALGORITHM_VERSION = "2026.11-r2"
 
@@ -97,14 +97,18 @@ def bin_coverage(glm_starts: list[pd.Timestamp], bins: pd.DatetimeIndex) -> pd.S
 
 
 def complete_bins(
-    flashes: pd.DataFrame, start: pd.Timestamp, data_end: pd.Timestamp, glm_starts: list[pd.Timestamp]
+    flashes: pd.DataFrame,
+    start: pd.Timestamp,
+    data_end: pd.Timestamp,
+    glm_starts: list[pd.Timestamp],
+    center: tuple[float, float] = (EVENT_LAT, EVENT_LON),
 ) -> pd.Series:
-    """5-minute flash counts near Requínoa. A bin is zero only if its GLM files arrived;
+    """5-minute flash counts near `center`. A bin is zero only if its GLM files arrived;
     a bin with missing files is NaN, because absent data is not absent lightning."""
     bins = pd.date_range(start.ceil(GLM_BIN), data_end.floor(GLM_BIN), freq=GLM_BIN, inclusive="left")
     counts = pd.Series(0.0, index=bins)
     if not flashes.empty:
-        counts = flash_counts(flashes, radius_km=RADIUS_KM).reindex(bins, fill_value=0).astype(float)
+        counts = flash_counts(flashes, radius_km=RADIUS_KM, center=center).reindex(bins, fill_value=0).astype(float)
     coverage = bin_coverage(glm_starts, bins)
     return (counts / coverage).where(coverage >= MIN_BIN_COVERAGE)
 
@@ -156,6 +160,51 @@ def public_level(level: str, health: dict) -> str:
     """Without complete data a quiet result is unproven, so it becomes 'unknown'.
     Positive findings stand: they rest on data that did arrive."""
     return "unknown" if level == "quiet" and health["state"] != "healthy" else level
+
+
+def zone_status(
+    name: str,
+    center: tuple[float, float],
+    abi: xr.Dataset,
+    flashes: pd.DataFrame,
+    start: pd.Timestamp,
+    data_end: pd.Timestamp,
+    glm_starts: list[pd.Timestamp],
+    health: dict,
+) -> dict:
+    """The alert rule around one town: the same rule and radius as around Requínoa, where
+    it was first tried. Everywhere else it is the same sum, never checked against a storm."""
+    tops = cloud_top_series(abi, radius_km=RADIUS_KM, center=center)
+    counts = complete_bins(flashes, start, data_end, glm_starts, center)
+    level, alerts = classify(tops, counts, data_end)
+    level = public_level(level, health)
+    coldest = float(tops.iloc[-1].min_bt_c)
+    if level == "quiet" and pd.isna(coldest):
+        level = "unknown"  # no cloud reading for this zone: quiet would be a guess
+    return {
+        "name": name,
+        "center": [center[0], center[1]],
+        "level": level,
+        "alerts_utc": [t.isoformat() for t in alerts],
+        "episode_start_utc": episodes(alert_times(tops, counts))[-1].isoformat() if level == "severe" else None,
+        "coldest_top_c": None if pd.isna(coldest) else round(coldest, 1),
+        **series(tops, counts),
+    }
+
+
+def series(tops: pd.DataFrame, counts: pd.Series) -> dict:
+    """Flash counts per 5 minutes (with their jumps) and the coldest top per scan."""
+    jumps = lightning_jumps(counts)
+    return {
+        "flashes_per_5min": [
+            {"start_utc": t.isoformat(), "count": None if pd.isna(c) else int(c), "jump": bool(jumps[t])}
+            for t, c in counts.items()
+        ],
+        "cloud_tops": [
+            {"time_utc": row.time.isoformat(), "min_bt_c": None if pd.isna(row.min_bt_c) else round(float(row.min_bt_c), 1)}
+            for row in tops.itertuples()
+        ],
+    }
 
 
 def fetch(start: datetime, end: datetime, fs: s3fs.S3FileSystem):
@@ -295,7 +344,6 @@ def run_once(at: datetime, fs: s3fs.S3FileSystem, lookback: timedelta = LOOKBACK
     health = source_health(list(tops.time), glm_starts, counts, pd.Timestamp(start), pd.Timestamp(at))
     level, alerts = classify(tops, counts, data_end)
     level = public_level(level, health)
-    jumps = lightning_jumps(counts)
     episode_start = episodes(alert_times(tops, counts))[-1] if level == "severe" else None
 
     latest = tops.iloc[-1]
@@ -315,13 +363,13 @@ def run_once(at: datetime, fs: s3fs.S3FileSystem, lookback: timedelta = LOOKBACK
         "center": [EVENT_LAT, EVENT_LON],
         # Cloud tops and flashes are mapped over this whole box; the alert only covers radius_km.
         "observed_bbox": BBOX,
-        "flashes_per_5min": [
-            {"start_utc": t.isoformat(), "count": None if pd.isna(c) else int(c), "jump": bool(jumps[t])}
-            for t, c in counts.items()
+        # The rule around every town of the app (schema 6); the fields above stay as the
+        # Requínoa zone for app versions that do not read this yet.
+        "zones": [
+            zone_status(name, (lat, lon), abi, flashes, pd.Timestamp(start), data_end, glm_starts, health)
+            for name, lat, lon in TOWNS
         ],
-        "cloud_tops": [
-            {"time_utc": row.time.isoformat(), "min_bt_c": round(float(row.min_bt_c), 1)} for row in tops.itertuples()
-        ],
+        **series(tops, counts),
         **map_layers(abi, flashes, data_end),
     }
     OUT_DIR.mkdir(parents=True, exist_ok=True)

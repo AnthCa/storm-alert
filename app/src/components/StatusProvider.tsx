@@ -1,9 +1,9 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { useOnline, useStoredValue } from "@/lib/browser-store";
 import { coarsen } from "@/lib/geo";
-import { DEMO_STATUS_URL, LIVE_STATUS_URL, fetchStatus, takeEarlyStatus, type Status } from "@/lib/status";
+import { DEMO_STATUS_URL, LIVE_STATUS_URL, fetchStatus, focusStatus, takeEarlyStatus, type Status } from "@/lib/status";
 
 const POLL_MS = 60_000;
 const LOCATION_KEY = "storm-alert:location";
@@ -32,7 +32,7 @@ interface StatusContextValue {
 const StatusContext = createContext<StatusContextValue | null>(null);
 
 export function StatusProvider({ children }: { children: React.ReactNode }) {
-  const [status, setStatus] = useState<Status | null>(null);
+  const [published, setStatus] = useState<Status | null>(null);
   const [error, setError] = useState<string | null>(null);
   // Demo mode lasts while the tab is open, so it survives navigating between screens.
   const [demo, setDemoFlag] = useStoredValue(DEMO_KEY, false, "session");
@@ -46,6 +46,16 @@ export function StatusProvider({ children }: { children: React.ReactNode }) {
     [storePlace],
   );
   const clearPlace = useCallback(() => storePlace(null), [storePlace]);
+  // Every screen reads the alert zone of the viewer's place (the nearest town), or the
+  // most active zone when no place is set.
+  const placeLat = place?.lat;
+  const placeLon = place?.lon;
+  const status = useMemo(
+    () =>
+      published &&
+      focusStatus(published, placeLat !== undefined && placeLon !== undefined ? { lat: placeLat, lon: placeLon } : null),
+    [published, placeLat, placeLon],
+  );
 
   // A shared link like /?demo=requinoa opens straight into the demo.
   useEffect(() => {

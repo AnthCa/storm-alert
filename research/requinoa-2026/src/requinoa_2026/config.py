@@ -18,6 +18,33 @@ EVENT_TIME_UTC = datetime(2026, 10, 26, 20, 30, tzinfo=timezone.utc)
 # Bounding box around O'Higgins with a margin, in degrees (west is negative).
 BBOX = {"lat_min": -35.5, "lat_max": -33.5, "lon_min": -72.5, "lon_max": -69.5}
 
+# The app's towns (app/src/lib/geo.ts, TOWNS): name, latitude, longitude. Each is also the
+# centre of an alert zone in the realtime status.
+TOWNS = [
+    ("Rancagua", -34.17, -70.74),
+    ("Machalí", -34.18, -70.65),
+    ("Graneros", -34.07, -70.73),
+    ("Codegua", -34.04, -70.67),
+    ("Mostazal", -33.98, -70.71),
+    ("Doñihue", -34.23, -70.96),
+    ("Coltauco", -34.29, -71.08),
+    ("Requínoa", -34.29, -70.82),
+    ("Rengo", -34.4, -70.86),
+    ("Malloa", -34.45, -70.95),
+    ("San Vicente", -34.44, -71.08),
+    ("Pichidegua", -34.36, -71.28),
+    ("Peumo", -34.39, -71.17),
+    ("Las Cabras", -34.29, -71.31),
+    ("San Fernando", -34.58, -70.99),
+    ("Chimbarongo", -34.71, -71.04),
+    ("Nancagua", -34.66, -71.18),
+    ("Santa Cruz", -34.64, -71.37),
+    ("Peralillo", -34.48, -71.49),
+    ("Marchigüe", -34.4, -71.62),
+    ("Litueche", -34.12, -71.72),
+    ("Pichilemu", -34.39, -72.0),
+]
+
 # Valid times to analyze: pre-storm environment and the hour of the event.
 VALID_TIMES_UTC = [
     datetime(2026, 10, 26, 18, tzinfo=timezone.utc),

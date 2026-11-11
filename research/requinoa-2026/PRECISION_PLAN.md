@@ -273,6 +273,19 @@ Limits: flashes under tops warmer than -38 °C are not in the lightning grid; li
 days differ a lot between the two sets (17 in 359 days, 37 in 213).
 Files: `data/results/storm_outlook_t1_*`.
 
+## Alert zones per town (status schema 6, 2026-11-10)
+
+The rule (cold top <= -38 °C and a lightning jump within 50 km) is now computed around
+each of the app's 22 towns, not only around Requínoa. A viewer reads the zone of the
+town nearest to their place; the push sender does the same per saved place. The
+top-level fields of status.json stay as the Requínoa zone for older app versions.
+
+Not a validated extension: outside Requínoa the rule is the same sum and has never been
+compared with a storm. Zones overlap by design (50 km circles around towns 5 to 40 km
+apart), so one storm turns many zones severe at once: at 19:50 UTC on 2026-10-26, 13 of
+the 22, from Mostazal to San Fernando. Scoring per zone against the severe-events list
+is the next step before the reliability numbers can speak for the whole region.
+
 ## Reliability section in the app
 
 Published at the end of Phase A, and never before: no estimated or placeholder numbers.
