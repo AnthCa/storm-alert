@@ -58,7 +58,10 @@ export function base64UrlToBytes(value: string): Uint8Array<ArrayBuffer> {
   return bytes;
 }
 
-async function rpc(name: string, body: Record<string, unknown>): Promise<void> {
+/** Whether this build knows the Supabase project (the pilot and the sky reports need it). */
+export const SUPABASE_CONFIGURED = !!SUPABASE_URL && !!SUPABASE_ANON_KEY;
+
+export async function rpc(name: string, body: Record<string, unknown>): Promise<void> {
   const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${name}`, {
     method: "POST",
     // The apikey header alone selects the anon role; publishable keys (sb_publishable_…)
