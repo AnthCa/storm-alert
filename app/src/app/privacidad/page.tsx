@@ -15,7 +15,7 @@ const SECTIONS = [
   },
   {
     title: "Dónde se guarda y con qué precisión",
-    body: "En este dispositivo (almacenamiento del navegador), redondeada a unos 1 km. Los cálculos se hacen en tu teléfono o computador. Solo si activas las notificaciones del piloto enviamos puntos aproximados a nuestra base de datos (ver «Notificaciones»).",
+    body: "En este dispositivo (almacenamiento del navegador), redondeada a unos 1 km. Los cálculos se hacen en tu teléfono o computador. Solo enviamos puntos aproximados a nuestra base de datos si activas las notificaciones del piloto o si envías un reporte de lo que ves (ver «Notificaciones» y «Reportes»).",
   },
   {
     title: "Cuánto tiempo se conserva",
@@ -34,6 +34,10 @@ const SECTIONS = [
     body: "Son voluntarias y, por ahora, solo para personas invitadas a un piloto. Si las activas guardamos en nuestra base de datos (Supabase, región São Paulo) el punto aproximado (~1 km) de cada lugar que elijas (hasta 3), el radio, la dirección técnica de notificación de tu navegador y la hora de los últimos avisos enviados, para no repetirlos. Los nombres que les pones a tus lugares (por ejemplo, «Casa de mis papás») quedan solo en tu teléfono: nunca los recibimos. Los avisos se envían a través del servicio de notificaciones de tu navegador (Google, Apple o Mozilla). Al tocar «Desactivar» se borra tu suscripción.",
   },
   {
+    title: "Reportes de «¿Qué ves ahora?»",
+    body: "Son voluntarios y anónimos. Si envías uno guardamos en nuestra base de datos (Supabase, región São Paulo) lo que marcaste (por ejemplo, lluvia o truenos), el punto aproximado (~1 km) de tu ubicación, la hora y lo que la app mostraba en ese momento. No guardamos tu nombre, tu teléfono ni un identificador de tu dispositivo, y no se pueden escribir comentarios. Los usamos solo para medir cuánto acierta el satélite; no se publican.",
+  },
+  {
     title: "Lo que no hacemos",
     body: "No usamos tu ubicación para estadísticas ni publicidad, no tenemos cuentas de usuario y no vendemos datos. No guardamos un historial de lugares: si cambias tu punto, se reemplaza el anterior.",
   },
@@ -41,7 +45,7 @@ const SECTIONS = [
 
 export default function PrivacyPage() {
   return (
-    <PageShell title="Privacidad" intro="Última actualización: 31 de octubre de 2026.">
+    <PageShell title="Privacidad" intro="Última actualización: 10 de noviembre de 2026.">
       {SECTIONS.map((section) => (
         <section key={section.title} className="flex flex-col gap-1.5">
           <h2 className="text-lg font-semibold">{section.title}</h2>

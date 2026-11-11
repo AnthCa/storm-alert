@@ -28,6 +28,7 @@ import { AppHeader } from "./AppHeader";
 import { DemoBanner } from "./DemoBanner";
 import { CloudTrend, SavedPlacesTable, TimeStrip } from "./DesktopPanels";
 import { ShareStatus } from "./ShareStatus";
+import { SkyReport } from "./SkyReport";
 import { useStatus } from "./StatusProvider";
 import { WeatherDetails, WeatherLine } from "./WeatherNow";
 
@@ -240,6 +241,10 @@ export function HomeView() {
           </div>
         )}
         {weather && (wide ? <WeatherDetails {...weather} /> : !expanded && <WeatherLine {...weather} />)}
+        {/* Only for live data inside the mapped area: a report must match what the app shows. */}
+        {place && status && (state === "healthy" || state === "degraded") && insideObservedArea(status, place.lat, place.lon) && (
+          <SkyReport place={place} status={status} now={now} />
+        )}
         {locateMessage && (
           <p className="text-[13px] text-soft" role="status">
             {locateMessage}
