@@ -1,4 +1,5 @@
 -- "¿Qué ves ahora?": what people see in the sky, to check the satellite against the ground.
+-- Safe to run again: the table is kept and the function is replaced (2026-11-12: "partly").
 --
 -- Anonymous on purpose: a rounded point (~1 km), what was seen, and what the app was
 -- showing at that moment. No account, no device id, no free text. Nobody reads or writes
@@ -10,7 +11,7 @@ create table if not exists public.sky_reports (
   created_at timestamptz not null default now(),
   lat numeric(5, 2) not null,
   lon numeric(5, 2) not null,
-  -- Any of: clear, cloudy, rain, heavy_rain, hail, thunder, lightning, wind.
+  -- Any of: clear, partly, cloudy, rain, heavy_rain, hail, thunder, lightning, wind.
   seen text[] not null,
   -- What the app said when the report was sent, to compare later.
   app_level text,
@@ -26,8 +27,8 @@ create or replace function public.report_sky(
 language plpgsql security definer set search_path = public as $$
 #variable_conflict use_column
 begin
-  if report_sky.seen is null or cardinality(report_sky.seen) not between 1 and 8
-     or not report_sky.seen <@ array['clear', 'cloudy', 'rain', 'heavy_rain', 'hail', 'thunder', 'lightning', 'wind'] then
+  if report_sky.seen is null or cardinality(report_sky.seen) not between 1 and 9
+     or not report_sky.seen <@ array['clear', 'partly', 'cloudy', 'rain', 'heavy_rain', 'hail', 'thunder', 'lightning', 'wind'] then
     raise exception 'invalid report' using errcode = '22023';
   end if;
   -- Only the mapped region (status.json observed_bbox, with a margin).

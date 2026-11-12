@@ -13,6 +13,12 @@ describe("sky reports", () => {
     expect(toggleKind(["clear"], "rain")).toEqual(["rain"]);
   });
 
+  it("keeps one sky cover at a time, and sun and clouds can come with rain", () => {
+    expect(toggleKind(["cloudy", "rain"], "partly")).toEqual(["rain", "partly"]);
+    expect(toggleKind(["partly"], "cloudy")).toEqual(["cloudy"]);
+    expect(toggleKind(["partly", "rain"], "clear")).toEqual(["clear"]);
+  });
+
   it("allows one report every ten minutes", () => {
     expect(canReport(null, 0)).toBe(true);
     expect(canReport(1_000, 1_000 + REPORT_EVERY_MS - 1)).toBe(false);
