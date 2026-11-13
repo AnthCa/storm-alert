@@ -37,23 +37,6 @@ interface Props {
   hideRain?: boolean;
 }
 
-/** One line under the storm answer: the basics, always visible on a phone. */
-export function WeatherLine({ lat, lon, refreshKey, hideRain }: Props) {
-  const w = useWeather(lat, lon, refreshKey);
-  if (!w) return null;
-  return (
-    <p className="flex flex-wrap items-baseline gap-x-2.5 text-[15px] text-soft">
-      <span className="font-semibold text-fg">{deg(w.tempC)}C</span>
-      <span>sensación {deg(w.feelsC)}</span>
-      <span>
-        viento {kmh(w.windKmh)} {w.windFrom}
-      </span>
-      {w.rainChance !== null && !hideRain && <span>{rainOutlook(w.rainChance)} la próxima hora</span>}
-      <span className="text-[13px] text-muted">modelo Open-Meteo</span>
-    </p>
-  );
-}
-
 /** The full block inside "Ver detalles" and on the desktop panel. */
 export function WeatherDetails({ lat, lon, town, refreshKey, hideRain }: Props) {
   const w = useWeather(lat, lon, refreshKey);
