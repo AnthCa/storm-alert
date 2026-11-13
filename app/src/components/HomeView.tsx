@@ -29,8 +29,9 @@ import { DemoBanner } from "./DemoBanner";
 import { CloudTrend, SavedPlacesTable, TimeStrip } from "./DesktopPanels";
 import { ShareStatus } from "./ShareStatus";
 import { SkyReport } from "./SkyReport";
+import { SUPABASE_CONFIGURED } from "@/lib/push";
 import { useStatus } from "./StatusProvider";
-import { WeatherDetails, WeatherLine } from "./WeatherNow";
+import { WeatherDetails } from "./WeatherNow";
 
 // MapLibre needs the browser (WebGL), so the map is never server-rendered.
 const StormMap = dynamic(() => import("./StormMap"), {
@@ -97,6 +98,13 @@ export function HomeView() {
           refreshKey: status.data_until_utc,
           hideRain: stormWithLightning,
         }
+      : null;
+  // Only for live data inside the mapped area: a report must match what the app shows.
+  const skyReport =
+    SUPABASE_CONFIGURED &&
+    place &&
+    status && (state === "healthy" || state === "degraded") && insideObservedArea(status, place.lat, place.lon)
+      ? { place, status, now }
       : null;
 
   async function handleLocate() {
@@ -240,11 +248,9 @@ export function HomeView() {
             </button>
           </div>
         )}
-        {weather && (wide ? <WeatherDetails {...weather} /> : !expanded && <WeatherLine {...weather} />)}
-        {/* Only for live data inside the mapped area: a report must match what the app shows. */}
-        {place && status && (state === "healthy" || state === "degraded") && insideObservedArea(status, place.lat, place.lon) && (
-          <SkyReport place={place} status={status} now={now} />
-        )}
+        {/* Phones keep the weather in the details, so the closed sheet leaves the map visible. */}
+        {weather && wide && <WeatherDetails {...weather} />}
+        {wide && skyReport && <SkyReport {...skyReport} />}
         {locateMessage && (
           <p className="text-[13px] text-soft" role="status">
             {locateMessage}
@@ -255,7 +261,7 @@ export function HomeView() {
         )}
         {wide && status && <SavedPlacesTable status={status} />}
         {wide && status && <CloudTrend status={status} />}
-        <Legend allClouds={allClouds} onToggleClouds={() => setAllClouds(!allClouds)} />
+        <Legend allClouds={allClouds} onToggleClouds={() => setAllClouds(!allClouds)} full={detailed} />
         <div id="storm-details" className="collapsible -mt-2.5 lg:-mt-5" data-open={detailed} inert={!detailed}>
           <div>
             {/* Capped on phones so the sheet never grows past the screen and hides its own close button. */}
@@ -279,16 +285,19 @@ export function HomeView() {
             Observación experimental. No reemplaza los avisos de SENAPRED ni de la Dirección Meteorológica.
           </p>
         ) : (
-          <button
-            type="button"
-            onClick={() => setExpanded(!expanded)}
-            aria-expanded={expanded}
-            aria-controls="storm-details"
-            className="flex min-h-9 items-center justify-center gap-1 text-[13px] font-semibold text-quiet"
-          >
-            {expanded ? "Ocultar detalles" : "Ver detalles"}
-            <ChevronRightIcon size={14} className={`transition-transform duration-300 ${expanded ? "-rotate-90" : "rotate-90"}`} />
-          </button>
+          <div className={`flex flex-wrap items-center gap-x-3 ${skyReport ? "justify-between" : "justify-center"}`}>
+            {skyReport && <SkyReport {...skyReport} compact />}
+            <button
+              type="button"
+              onClick={() => setExpanded(!expanded)}
+              aria-expanded={expanded}
+              aria-controls="storm-details"
+              className="flex min-h-9 items-center justify-center gap-1 text-[13px] font-semibold text-quiet"
+            >
+              {expanded ? "Ocultar detalles" : "Ver detalles"}
+              <ChevronRightIcon size={14} className={`transition-transform duration-300 ${expanded ? "-rotate-90" : "rotate-90"}`} />
+            </button>
+          </div>
         )}
       </section>
     </main>
@@ -721,7 +730,25 @@ function Stat({ label, value, note, highlight }: { label: string; value: string;
 const CLOUD_GRADIENT = `linear-gradient(to right, ${CLOUD_RAMP.map(([, [r, g, b], a]) => `rgba(${r},${g},${b},${a / 255})`).join(", ")})`;
 
 /** Always visible: the colours are the map's main message, so they need words next to them. */
-function Legend({ allClouds, onToggleClouds }: { allClouds: boolean; onToggleClouds: () => void }) {
+function Legend({ allClouds, onToggleClouds, full }: { allClouds: boolean; onToggleClouds: () => void; full: boolean }) {
+  // Closed phone sheet: one line of colours; the older-flash mark and the grey toggle wait in the details.
+  if (!full) {
+    return (
+      <div
+        className="flex items-center gap-2 text-[13px] text-soft"
+        aria-label="Leyenda: nubes de tormenta, de débil a intensa; rayo amarillo, rayos de los últimos 5 minutos"
+      >
+        <span className="shrink-0">Nubes</span>
+        <span className="text-muted">débil</span>
+        <span className="h-2 min-w-8 grow rounded-full" style={{ background: CLOUD_GRADIENT }} aria-hidden="true" />
+        <span className="text-muted">intensa</span>
+        <span className="flex shrink-0 items-center gap-1">
+          <BoltFilledIcon size={12} className="text-[#FFE14D]" />
+          Rayo
+        </span>
+      </div>
+    );
+  }
   return (
     <div className="flex flex-col gap-2">
       <div

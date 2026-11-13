@@ -12,7 +12,18 @@ const LAST_KEY = "miranubes:last-sky-report";
  * "¿Qué ves ahora?": one tap to open, a few chips, send. The reports are not shown to
  * anyone: they are the ground truth the satellite is checked against.
  */
-export function SkyReport({ place, status, now }: { place: { lat: number; lon: number }; status: Status; now: number }) {
+export function SkyReport({
+  place,
+  status,
+  now,
+  compact = false,
+}: {
+  place: { lat: number; lon: number };
+  status: Status;
+  now: number;
+  /** Phones: a small link beside "Ver detalles", so the sheet leaves the map visible. */
+  compact?: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const [seen, setSeen] = useState<SkyKind[]>([]);
   const [state, setState] = useState<"idle" | "sending" | "error">("idle");
@@ -22,11 +33,18 @@ export function SkyReport({ place, status, now }: { place: { lat: number; lon: n
   if (now > 0 && !canReport(lastSent, now)) {
     return (
       <p className="text-[13px] text-soft" role="status">
-        Gracias por contarnos lo que ves. Nos ayuda a medir cuánto acierta el satélite.
+        {compact ? "Gracias por tu reporte" : "Gracias por contarnos lo que ves. Nos ayuda a medir cuánto acierta el satélite."}
       </p>
     );
   }
   if (!open) {
+    if (compact) {
+      return (
+        <button type="button" onClick={() => setOpen(true)} className="flex min-h-9 items-center text-[13px] font-semibold text-accent">
+          ¿Qué ves en el cielo?
+        </button>
+      );
+    }
     return (
       <button
         type="button"
@@ -52,7 +70,7 @@ export function SkyReport({ place, status, now }: { place: { lat: number; lon: n
   }
 
   return (
-    <div className="flex flex-col gap-2.5 rounded-xl border border-line bg-surface-2 p-3" role="group" aria-label="¿Qué ves ahora en el cielo?">
+    <div className="flex w-full flex-col gap-2.5 rounded-xl border border-line bg-surface-2 p-3" role="group" aria-label="¿Qué ves ahora en el cielo?">
       <p className="text-sm font-semibold">¿Qué ves ahora en el cielo?</p>
       <div className="flex flex-wrap gap-2">
         {SKY_OPTIONS.map(({ key, label }) => {
