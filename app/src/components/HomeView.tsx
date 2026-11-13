@@ -731,45 +731,45 @@ const CLOUD_GRADIENT = `linear-gradient(to right, ${CLOUD_RAMP.map(([, [r, g, b]
 
 /** Always visible: the colours are the map's main message, so they need words next to them. */
 function Legend({ allClouds, onToggleClouds, full }: { allClouds: boolean; onToggleClouds: () => void; full: boolean }) {
-  // Closed phone sheet: one line of colours; the older-flash mark and the grey toggle wait in the details.
-  if (!full) {
-    return (
-      <div
-        className="flex items-center gap-2 text-[13px] text-soft"
-        aria-label="Leyenda: nubes de tormenta, de débil a intensa; rayo amarillo, rayos de los últimos 5 minutos"
-      >
-        <span className="shrink-0">Nubes</span>
-        <span className="text-muted">débil</span>
-        <span className="h-2 min-w-8 grow rounded-full" style={{ background: CLOUD_GRADIENT }} aria-hidden="true" />
-        <span className="text-muted">intensa</span>
-        <span className="flex shrink-0 items-center gap-1">
-          <BoltFilledIcon size={12} className="text-[#FFE14D]" />
-          Rayo
-        </span>
-      </div>
-    );
-  }
   return (
     <div className="flex flex-col gap-2">
-      <div
-        className="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-[13px] text-soft"
-        aria-label="Leyenda: nubes de tormenta, de débil a intensa; rayo amarillo, rayos de los últimos 5 minutos; rayo apagado, de hace 5 a 10 minutos"
-      >
-        <span className="flex min-w-48 grow items-center gap-2">
+      {/* Closed phone sheet: one line of colours; the older-flash mark waits in the details. */}
+      {full ? (
+        <div
+          className="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-[13px] text-soft"
+          aria-label="Leyenda: nubes de tormenta, de débil a intensa; rayo amarillo, rayos de los últimos 5 minutos; rayo apagado, de hace 5 a 10 minutos"
+        >
+          <span className="flex min-w-48 grow items-center gap-2">
+            <span className="shrink-0">Nubes</span>
+            <span className="text-muted">débil</span>
+            <span className="h-2 min-w-12 grow rounded-full" style={{ background: CLOUD_GRADIENT }} aria-hidden="true" />
+            <span className="text-muted">intensa</span>
+          </span>
+          <span className="flex shrink-0 items-center gap-1">
+            <BoltFilledIcon size={12} className="text-[#FFE14D]" />
+            Rayo ahora
+          </span>
+          <span className="flex shrink-0 items-center gap-1">
+            <BoltFilledIcon size={12} className="text-[#B9A96A]" />
+            hace 5–10 min
+          </span>
+        </div>
+      ) : (
+        <div
+          className="flex items-center gap-2 text-[13px] text-soft"
+          aria-label="Leyenda: nubes de tormenta, de débil a intensa; rayo amarillo, rayos de los últimos 5 minutos"
+        >
           <span className="shrink-0">Nubes</span>
           <span className="text-muted">débil</span>
-          <span className="h-2 min-w-12 grow rounded-full" style={{ background: CLOUD_GRADIENT }} aria-hidden="true" />
+          <span className="h-2 min-w-8 grow rounded-full" style={{ background: CLOUD_GRADIENT }} aria-hidden="true" />
           <span className="text-muted">intensa</span>
-        </span>
-        <span className="flex shrink-0 items-center gap-1">
-          <BoltFilledIcon size={12} className="text-[#FFE14D]" />
-          Rayo ahora
-        </span>
-        <span className="flex shrink-0 items-center gap-1">
-          <BoltFilledIcon size={12} className="text-[#B9A96A]" />
-          hace 5–10 min
-        </span>
-      </div>
+          <span className="flex shrink-0 items-center gap-1">
+            <BoltFilledIcon size={12} className="text-[#FFE14D]" />
+            Rayo
+          </span>
+        </div>
+      )}
+      {/* Always in view: switching the grey layer on and off is a quick way to read the map. */}
       <button
         type="button"
         aria-pressed={allClouds}
