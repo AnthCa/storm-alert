@@ -136,6 +136,14 @@ def read_abi_crop(key: str, fs: s3fs.S3FileSystem) -> xr.Dataset:
     )
 
 
+def read_cloud_mask(key: str, fs: s3fs.S3FileSystem) -> np.ndarray:
+    """NOAA's clear-sky mask (ABI-L2-ACMF, BCM: 1 cloudy, 0 clear) over the same window as
+    `read_abi_crop`. Both products share the 2 km fixed grid, so the arrays line up."""
+    with fs.open(key) as remote:
+        ds = xr.open_dataset(remote, engine="h5netcdf")
+        return ds.BCM.isel(**bbox_window(ds)).values
+
+
 def read_glm_flashes(key: str, fs: s3fs.S3FileSystem, bbox: dict = BBOX) -> pd.DataFrame:
     with fs.open(key) as remote:
         ds = xr.open_dataset(remote, engine="h5netcdf")

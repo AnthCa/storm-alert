@@ -24,7 +24,7 @@ from scipy import ndimage
 
 from requinoa_2026.config import BBOX, DATA_DIR, EVENT_LAT, EVENT_LON, TOWNS
 from requinoa_2026.false_alarms import COLD_TOP_C, RADIUS_KM, alert_times, episodes
-from requinoa_2026.goes import hourly_keys, read_abi_crop, read_glm_flashes, scan_start, with_retries
+from requinoa_2026.goes import hourly_keys, read_abi_crop, read_cloud_mask, read_glm_flashes, scan_start, with_retries
 from requinoa_2026.satellite_analysis import GLM_BIN, cloud_top_series, flash_counts, lightning_jumps, parallax_correct
 
 OUT_DIR = DATA_DIR / "realtime"
@@ -65,6 +65,8 @@ FLASH_CELL_DEG = 0.02
 CLOUD_FIELD_DEG = 0.025
 CLOUD_FIELD_WARM_C = 20.0
 CLOUD_FIELD_STEP = 2.5
+# Stand-in temperature for pixels NOAA's cloud mask calls clear (never a real cloud top).
+CLEAR_SKY = 1000.0
 # Rough cloud-top height from its temperature (standard lapse rate from ~15 C at the
 # ground), for the parallax shift: low cloud moves little, storm tops ~10 km.
 LAPSE_C_PER_KM = 6.5
@@ -258,17 +260,31 @@ def cold_history(abi: xr.Dataset, scans: int = HISTORY_SCANS) -> list[dict]:
     ]
 
 
-def cloud_field(scan: xr.Dataset, box: dict = BBOX, cell_deg: float = CLOUD_FIELD_DEG) -> dict:
+def cloud_field(
+    scan: xr.Dataset, box: dict = BBOX, cell_deg: float = CLOUD_FIELD_DEG, cloudy: np.ndarray | None = None
+) -> dict:
     """Every cloud top of one scan on a regular grid over `box`, as a base64 byte image.
 
     Each pixel is parallax-corrected for a height guessed from its temperature, so low
     cloud and storm tops both sit over the ground below them. Cells no pixel landed in
     take the coldest neighbour, which closes the gaps between rows.
+
+    With `cloudy` (NOAA's mask for the same scan), the mask says where cloud is and the
+    temperature only how high: low cloud as warm as the sea or the ground gets byte 1 or
+    more, and cold clear ground (the snowy Andes at night) gets 0. Without it, the app
+    falls back to guessing cloud from temperature alone.
     """
     bt_c = scan.brightness_temp_k.values - 273.15
     valid = np.isfinite(bt_c)
+    if cloudy is not None:
+        valid &= np.isfinite(cloudy)
     temps = bt_c[valid]
     height_m = np.clip((SURFACE_C - temps) / LAPSE_C_PER_KM, 0, 12) * 1000
+    if cloudy is not None:
+        # Clear pixels stay in the grid as "clear" so they are not filled from cloudy neighbours.
+        clear = cloudy[valid] != 1
+        temps = np.where(clear, CLEAR_SKY, temps)
+        height_m = np.where(clear, 0, height_m)
     lats, lons = parallax_correct(scan.lat.values[valid], scan.lon.values[valid], height_m)
     width = round((box["lon_max"] - box["lon_min"]) / cell_deg)
     height = round((box["lat_max"] - box["lat_min"]) / cell_deg)
@@ -280,15 +296,43 @@ def cloud_field(scan: xr.Dataset, box: dict = BBOX, cell_deg: float = CLOUD_FIEL
     padded = np.pad(grid, 1, constant_values=np.inf)
     neighbours = np.min([padded[1 + dy : 1 + dy + height, 1 + dx : 1 + dx + width] for dy in (-1, 0, 1) for dx in (-1, 0, 1)], axis=0)
     grid = np.where(np.isinf(grid), neighbours, grid)
-    values = np.where(np.isinf(grid), 0, np.clip((CLOUD_FIELD_WARM_C - grid) * CLOUD_FIELD_STEP, 0, 255))
+    empty = np.isinf(grid) | (grid >= CLEAR_SKY)
+    lowest = 1 if cloudy is not None else 0
+    values = np.where(empty, 0, np.clip((CLOUD_FIELD_WARM_C - grid) * CLOUD_FIELD_STEP, lowest, 255))
     return {
         "time_utc": pd.Timestamp(scan.time.values).tz_localize("UTC").isoformat(),
         "width": width,
         "height": height,
         "warm_c": CLOUD_FIELD_WARM_C,
         "step": CLOUD_FIELD_STEP,
+        # "noaa": every non-zero byte is cloud. "temperature": the app guesses from the value.
+        "mask": "noaa" if cloudy is not None else "temperature",
         "data": base64.b64encode(values.round().astype(np.uint8).tobytes()).decode("ascii"),
     }
+
+
+def latest_masked_scan(abi: xr.Dataset, fs: s3fs.S3FileSystem) -> tuple[xr.Dataset, np.ndarray] | None:
+    """The newest band 13 scan that NOAA's cloud mask already covers, with that mask.
+
+    The mask is produced from the same scan a little after it, so the very latest scan
+    may not have one yet; the one before is then used. None when no mask is usable: the
+    grey layer then falls back to temperature alone, and nothing else depends on it.
+    """
+    times = [pd.Timestamp(t) for t in abi.time.values]
+    try:
+        recent = times[-2:]
+        start = recent[0].tz_localize("UTC").to_pydatetime()
+        end = (recent[-1] + ABI_SCAN).tz_localize("UTC").to_pydatetime()
+        by_start = {pd.Timestamp(scan_start(k)).tz_convert(None): k for k in hourly_keys("ABI-L2-ACMF", start, end, fs)}
+        for t in reversed(recent):
+            if t in by_start:
+                scan = abi.sel(time=t)
+                cloudy = with_retries(read_cloud_mask, by_start[t], fs)
+                if cloudy.shape == scan.brightness_temp_k.shape:
+                    return scan, cloudy
+    except Exception as error:  # display only: never let the mask stop a run
+        print(f"cloud mask unavailable: {error}")
+    return None
 
 
 def latest_flash_cells(
@@ -310,7 +354,12 @@ def latest_flash_cells(
     return [[round(float(la), 3), round(float(lo), 3), round(float(a), 1)] for la, lo, a in zip(cells.lat, cells.lon, ages)]
 
 
-def map_layers(abi: xr.Dataset, flashes: pd.DataFrame, data_end: pd.Timestamp) -> dict:
+def map_layers(
+    abi: xr.Dataset,
+    flashes: pd.DataFrame,
+    data_end: pd.Timestamp,
+    masked: tuple[xr.Dataset, np.ndarray] | None = None,
+) -> dict:
     """Cold cloud-top pixels of the latest scan (groups of MIN_CLUSTER_PIXELS or more)
     and flashes of the last 10 minutes.
 
@@ -328,7 +377,7 @@ def map_layers(abi: xr.Dataset, flashes: pd.DataFrame, data_end: pd.Timestamp) -
     recent = flashes[flashes.time >= data_end - pd.Timedelta("10min")]
     return {
         "cold_pixels": cold_pixels,
-        "cloud_field": cloud_field(last),
+        "cloud_field": cloud_field(masked[0], cloudy=masked[1]) if masked else cloud_field(last),
         "cold_history": cold_history(abi),
         "recent_flashes": recent[["lat", "lon"]].round(3).values.tolist(),
         "flash_cells_30min": latest_flash_cells(flashes, data_end),
@@ -370,7 +419,7 @@ def run_once(at: datetime, fs: s3fs.S3FileSystem, lookback: timedelta = LOOKBACK
             for name, lat, lon in TOWNS
         ],
         **series(tops, counts),
-        **map_layers(abi, flashes, data_end),
+        **map_layers(abi, flashes, data_end, latest_masked_scan(abi, fs)),
     }
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     (OUT_DIR / "status.json").write_text(json.dumps(status, indent=2))

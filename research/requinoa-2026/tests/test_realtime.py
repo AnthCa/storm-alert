@@ -175,6 +175,33 @@ def test_cloud_field_marks_cold_cloud_and_leaves_warm_ground_empty():
     assert 0 in values  # cells far from any cloud stay clear
 
 
+def field_values(field: dict) -> np.ndarray:
+    return np.frombuffer(base64.b64decode(field["data"]), dtype=np.uint8)
+
+
+def test_cloud_mask_shows_warm_low_cloud_and_hides_cold_clear_ground():
+    box = {"lat_min": -34.4, "lat_max": -34.2, "lon_min": -70.9, "lon_max": -70.7}
+    scan = abi_scans([[13.0, 13.0, -10.0]]).isel(time=0)
+    # NOAA: the 13 C pixels are low cloud; the -10 C one is clear (snowy ground at night).
+    field = cloud_field(scan, box, cell_deg=0.05, cloudy=np.array([[1.0, 1.0, 0.0]]))
+    assert field["mask"] == "noaa"
+    values = field_values(field)
+    assert values.max() == round((20 - 13) * 2.5)  # low cloud kept, with its own height
+    assert round((20 + 10) * 2.5) not in values  # the clear cold pixel is not drawn
+
+
+def test_warm_masked_cloud_is_never_byte_zero():
+    box = {"lat_min": -34.4, "lat_max": -34.2, "lon_min": -70.9, "lon_max": -70.7}
+    scan = abi_scans([[24.0, 24.0, 24.0]]).isel(time=0)
+    values = field_values(cloud_field(scan, box, cell_deg=0.05, cloudy=np.ones((1, 3))))
+    assert values.max() == 1  # warmer than warm_c, still cloud
+
+
+def test_without_a_mask_the_field_says_so():
+    box = {"lat_min": -34.4, "lat_max": -34.2, "lon_min": -70.9, "lon_max": -70.7}
+    assert cloud_field(abi_scans([[13.0, 13.0, 13.0]]).isel(time=0), box, cell_deg=0.05)["mask"] == "temperature"
+
+
 def test_a_zone_reads_only_the_storm_within_its_own_radius():
     from requinoa_2026.realtime import zone_status
 
