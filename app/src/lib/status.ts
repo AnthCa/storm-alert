@@ -42,6 +42,12 @@ export interface CloudField {
   /** Temperature in C = warm_c - byte / step; byte 0 is ground or warm low cloud. */
   warm_c: number;
   step: number;
+  /**
+   * "noaa": NOAA's cloud mask decided where cloud is, so every non-zero byte is cloud,
+   * low cloud included. "temperature" or missing (older files): cloud is guessed from
+   * the value alone.
+   */
+  mask?: "noaa" | "temperature";
   /** Base64 bytes, row 0 at the north edge. */
   data: string;
 }

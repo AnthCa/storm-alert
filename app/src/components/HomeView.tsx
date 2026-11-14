@@ -268,7 +268,7 @@ export function HomeView() {
             <div className="flex max-h-[40dvh] flex-col gap-3 overflow-y-auto overscroll-contain pt-2.5 lg:max-h-none lg:overflow-visible lg:pt-5">
               <p className="text-[13px] text-soft">
                 Colores de las nubes: más fría = más alta = tormenta más intensa. Naranja desde −38 °C (nube de
-                tormenta), rojo desde −44 °C, rojo oscuro bajo −50 °C y magenta en los topes más fríos. En gris, el resto de las nubes: más blancas mientras más altas. Datos de nubes de las{" "}
+                tormenta), rojo desde −44 °C, rojo oscuro bajo −50 °C y magenta en los topes más fríos. En gris, el resto de las nubes según la máscara de nubes de NOAA, incluidas las bajas: más blancas mientras más altas. Datos de nubes de las{" "}
                 {status ? localTime(status.latest_scan_utc) : "—"} y de rayos hasta las{" "}
                 {status ? localTime(status.data_until_utc) : "—"}.
               </p>
