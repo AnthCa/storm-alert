@@ -312,3 +312,17 @@ The numbers are recomputed and the date updated whenever the algorithm version c
 
 Each phase ends with a published score, so the DMC and SENAPRED one-pager can quote
 measured numbers instead of promises.
+
+## Grey all-clouds layer from NOAA's cloud mask (2026-11-14)
+
+A user under a full overcast in Rancagua (16:20 local) saw no grey on the map: band 13 read
+12–13 °C cloud tops, and the layer hid anything warmer than 5 °C. Temperature alone cannot
+separate low cloud from the sea (~14 °C) or from night-time ground, so the grey layer now
+takes *where* cloud is from NOAA's ABI-L2-ACMF clear-sky mask (BCM, same 2 km grid as band
+13) and only *how high* from band 13. Low cloud shows as a faint grey.
+
+Checks against band 13 on 11–14 Nov: by day the mask flags 80–88 % of the 5–22 °C pixels as
+cloud and only 3–12 % of the ≥22 °C ground; at night it calls 52–85 % of the ≤0 °C pixels
+clear (snowy Andes the old layer painted as cloud). Display only: the alert rule and the
+storm colours are unchanged. When no mask matches the latest two scans, the layer falls
+back to temperature alone (`cloud_field.mask = "temperature"`).
