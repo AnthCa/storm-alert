@@ -165,22 +165,30 @@ const SKY_CLEAR_C = 5;
 /** Tops at or below this get the full grey; the storm colours take over from −38 °C. */
 const SKY_FULL_C = -35;
 const SKY_MAX_ALPHA = 150;
+/** Low cloud confirmed by NOAA's mask: a faint grey, but always visible. */
+const SKY_LOW_ALPHA = 70;
 
-/** Opacity of the grey layer for a cloud-top temperature: warmer, more see-through. */
-export function skyAlpha(tempC: number): number {
+/**
+ * Opacity of the grey layer for a cloud-top temperature: warmer, more see-through.
+ * `confirmed` cloud (NOAA's mask) never drops below a faint grey, so an overcast of low
+ * cloud shows even though its top is as warm as the ground.
+ */
+export function skyAlpha(tempC: number, confirmed = false): number {
   const f = (SKY_CLEAR_C - tempC) / (SKY_CLEAR_C - SKY_FULL_C);
-  return Math.round(Math.min(1, Math.max(0, f)) * SKY_MAX_ALPHA);
+  const alpha = Math.round(Math.min(1, Math.max(0, f)) * SKY_MAX_ALPHA);
+  return confirmed ? Math.max(SKY_LOW_ALPHA, alpha) : alpha;
 }
 
 /** Decodes the pipeline's cloud field into a grey RGBA image; the map smooths it. */
 export function paintCloudField(field: CloudField): CloudImage {
   const bytes = Uint8Array.from(atob(field.data), (c) => c.charCodeAt(0));
   const data = new Uint8ClampedArray(field.width * field.height * 4);
+  const confirmed = field.mask === "noaa";
   for (let i = 0; i < field.width * field.height; i++) {
     data[i * 4] = SKY_GREY[0];
     data[i * 4 + 1] = SKY_GREY[1];
     data[i * 4 + 2] = SKY_GREY[2];
-    data[i * 4 + 3] = bytes[i] === 0 ? 0 : skyAlpha(field.warm_c - bytes[i] / field.step);
+    data[i * 4 + 3] = bytes[i] === 0 ? 0 : skyAlpha(field.warm_c - bytes[i] / field.step, confirmed);
   }
   return { width: field.width, height: field.height, data };
 }
